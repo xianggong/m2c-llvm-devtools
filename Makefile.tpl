@@ -15,7 +15,7 @@ dis_ir:
 	@-$(LLVM_DIS) KERNEL_NAME.opt.bc -o KERNEL_NAME.opt.ll $< > log.3 2>&1
 
 gen_asm:
-	@-$(LLC) $(LLC_PAR) KERNEL_NAME.opt.bc $< > log.4 2>&1
+	@-$(LLC) $(LLC_PAR) KERNEL_NAME.opt.bc --print-after-all $< > log.4 2>&1
 
 clean:
 	rm -rf *.bc *.ll log* *.s
