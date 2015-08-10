@@ -1,12 +1,18 @@
-LLVM_ROOT = /home/xgong/Develop/apps/m2c-llvm/bin
+# User need to set root information
+LIBCLC_ROOT = /home/xgong/Develop/apps/libclc/usr/local
+LLVM_ROOT = /home/xgong/Develop/llvm/build/bin
+
+LIBCLC_LIB = $(LIBCLC_ROOT)/lib/clc/
+LIBCLC_HEADER = $(LIBCLC_ROOT)/usr/local/include
+
 CLANG = $(LLVM_ROOT)/clang
-LLVM_AS = $(LLVM_ROOT)/llvm-as
-LLVM_DIS = $(LLVM_ROOT)/llvm-dis
-OPT = $(LLVM_ROOT)/opt
-LLC = /home/xgong/Develop/apps/m2c-llvm/bin/llc
+LLC = $(LLVM_ROOT)/llc
 
-CLANG_INC  = -I ../include -include ../include/clc/clc.h 
-CLANG_PAR  = -S -emit-llvm -D cl_clang_storage_class_specifiers
-CLANG_PAR += -O0 --target=amdgcn -mcpu=verde
+GPU = amdgcn
+GPUARCH = verde
 
-LLC_PAR = -march=amdgcn -mcpu=verde
+CLANG_INC  = -I LIBCLC_HEADER 
+CLANG_PAR  = -S -emit-llvm -Xclang -mlink-bitcode-file -Xclang $(LIBCLC_LIB)/$(GPUARCH)-$(GPU)--.bc
+CLANG_PAR += -Dcl_clang_storage_class_specifiers -target $(GPU) -mcpu=$(GPUARCH)
+
+LLC_PAR = -march=$(GPU) -mcpu=$(GPUARCH)
