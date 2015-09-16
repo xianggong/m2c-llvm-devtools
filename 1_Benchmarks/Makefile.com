@@ -8,8 +8,6 @@ LIBCLC_HEADER = $(LIBCLC_ROOT)/include
 CLANG = $(LLVM_ROOT)/clang
 LLC = $(LLVM_ROOT)/llc
 
-AMDCC = ./bin/amdcc
-
 GPU = amdgcn
 GPUARCH = verde
 OS = m2s

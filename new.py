@@ -38,8 +38,9 @@ def main():
         kernel_file_name = kernel_file.split(".")[0]
         if not os.path.exists(kernel_file_name):
                 os.makedirs(kernel_file_name)
-        shutil.copyfile(kernel_file_path, "./" + kernel_file_name + "/" +
-                kernel_file)
+	dst_kernel_file = "./" + kernel_file_name + "/" + kernel_file
+	if kernel_file_path != dst_kernel_file: 
+	        shutil.copyfile(kernel_file_path, dst_kernel_file)
 
         with open("Makefile.tpl", "r") as myfile:
                 makefile = myfile.read()
@@ -47,6 +48,8 @@ def main():
                 makefile_dst = open(kernel_file_name + "/Makefile", "w+")
                 makefile_dst.write(makefile_src)
                 makefile_dst.close()
+	if len(sys.argv) == 3:
+		shutil.move(kernel_file_name, sys.argv[2])
 
 if __name__ == "__main__":
         main()
