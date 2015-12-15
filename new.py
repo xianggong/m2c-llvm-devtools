@@ -36,6 +36,7 @@ def main():
         kernel_file_path = sys.argv[1]
         kernel_file = os.path.basename(kernel_file_path)
         kernel_file_name = kernel_file.split(".")[0]
+        kernel_path = kernel_file_name.split("_")[0]
         if not os.path.exists(kernel_file_name):
                 os.makedirs(kernel_file_name)
 	dst_kernel_file = "./" + kernel_file_name + "/" + kernel_file
@@ -45,6 +46,7 @@ def main():
         with open("Makefile.tpl", "r") as myfile:
                 makefile = myfile.read()
                 makefile_src = makefile.replace("KERNEL_NAME", kernel_file_name)
+                makefile_src = makefile_src.replace("KERNEL_PATH", kernel_path)
                 makefile_dst = open(kernel_file_name + "/Makefile", "w+")
                 makefile_dst.write(makefile_src)
                 makefile_dst.close()
