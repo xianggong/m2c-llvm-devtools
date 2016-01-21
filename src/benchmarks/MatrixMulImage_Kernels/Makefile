@@ -26,6 +26,8 @@ ifndef REMOTE_PATH
 $(error REMOTE_PATH is not set in Makefile.com)
 endif
 
+CURDIR = pwd
+
 amdRef: MatrixMulImage_Kernels.cl
 	@-$(AMDCC) $< >/dev/null 2>&1
 	@-rm *.il *.i
@@ -53,11 +55,14 @@ asm2bin:
 2bingdb:
 	@-gdb --args $(M2C) --si2bin MatrixMulImage_Kernels.s
 
-scpbin:
+scpbin: 
 	@-scp MatrixMulImage_Kernels.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/MatrixMulImage
 
-run:
+run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MatrixMulImage; make && make run"
+
+runisa: scpbin
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MatrixMulImage; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
 
 asmcb1: ir
 	@-$(LLC) $(LLC_PAR) MatrixMulImage_Kernels.ll --print-after-all --debug --view-dag-combine1-dags > log.1 2>&1

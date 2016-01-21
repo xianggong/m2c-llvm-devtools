@@ -26,6 +26,8 @@ ifndef REMOTE_PATH
 $(error REMOTE_PATH is not set in Makefile.com)
 endif
 
+CURDIR = pwd
+
 amdRef: MonteCarloAsianDP_Kernels.cl
 	@-$(AMDCC) $< >/dev/null 2>&1
 	@-rm *.il *.i
@@ -53,11 +55,14 @@ asm2bin:
 2bingdb:
 	@-gdb --args $(M2C) --si2bin MonteCarloAsianDP_Kernels.s
 
-scpbin:
+scpbin: 
 	@-scp MonteCarloAsianDP_Kernels.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/MonteCarloAsianDP
 
-run:
+run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsianDP; make && make run"
+
+runisa: scpbin
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsianDP; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
 
 asmcb1: ir
 	@-$(LLC) $(LLC_PAR) MonteCarloAsianDP_Kernels.ll --print-after-all --debug --view-dag-combine1-dags > log.1 2>&1
