@@ -54,4 +54,4 @@ def main():
 		shutil.move(kernel_file_name, sys.argv[2])
 
 if __name__ == "__main__":
-        main()
+    main()

@@ -26,13 +26,14 @@ ifndef REMOTE_PATH
 $(error REMOTE_PATH is not set in Makefile.com)
 endif
 
-CURDIR = pwd
+CURDIR = $(shell pwd)
 
 amdRef: SobelFilter_Kernels.cl
+	@-rm -f *.il *.i *.isa
 	@-$(AMDCC) $< >/dev/null 2>&1
-	@-rm *.il *.i
+	@-rm -f *.il *.i 
 	@-rename 's/_temp_0_Capeverde_//' *.isa
-	@-rm _temp_0*
+	@-rm -f _temp_0*
 
 ir: SobelFilter_Kernels.cl
 	@-$(CLANG) $(CLANG_INC) $(CLANG_PAR) $< > log.0 2>&1 
@@ -42,27 +43,47 @@ irRef: SobelFilter_Kernels.cl
 
 asm: ir
 	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug > log.1 2>&1
+	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --misched=si -o SobelFilter_Kernels_sched.s > log.sched.1 2>&1
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --disable-lsr --print-after-all --debug > log.1 2>&1
 
 asmpre2bin:
 	@-$(PRETOBIN) SobelFilter_Kernels.s > log.2 2>&1
+	@-$(PRETOBIN) SobelFilter_Kernels_sched.s > log.sched.2 2>&1
 
 asm2bin:
 	@-$(M2C) --si2bin SobelFilter_Kernels.s > log.2 2>&1
+	@-$(M2C) --si2bin SobelFilter_Kernels_sched.s > log.sched.2 2>&1
 
 2bingdb:
 	@-gdb --args $(M2C) --si2bin SobelFilter_Kernels.s
 
 scpbin: 
 	@-scp SobelFilter_Kernels.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/SobelFilter
+	@-scp SobelFilter_Kernels_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/SobelFilter
 
 run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make run"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make runsched"
+
+rundt: scpbin
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make rundt"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make runscheddt"
+
+scale: scpbin
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make scale"
+
+runtrace: scpbin
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make runtrace"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make runschedtrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
+	@-gzip -d *.gz
 
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make isasched && scp debug.sched.isa xgong@$(MYIP):$(CURDIR)"
 
 asmcb1: ir
 	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --view-dag-combine1-dags > log.1 2>&1
@@ -104,4 +125,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) SobelFilter_Kernels_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz

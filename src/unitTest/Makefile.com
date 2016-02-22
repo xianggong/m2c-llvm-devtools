@@ -1,3 +1,5 @@
+include ../../../../../server.conf
+
 # User need to set root information
 LIBCLC_ROOT = /home/xgong/Develop/apps/libclc/usr/local
 LLVM_ROOT = /home/xgong/Develop/llvm/build/bin
@@ -7,10 +9,9 @@ LIBCLC_HEADER = $(LIBCLC_ROOT)/include
 
 CLANG = $(LLVM_ROOT)/clang
 LLC = $(LLVM_ROOT)/llc
-AMDCC = ../../../bin/amdcc
-PRETOBIN = ../../../bin/pretobin.sh
+AMDCC = ../../../../../bin/amdcc
+PRETOBIN = ../../../../../bin/pretobin.sh
 REMOTE_SERVER = xgong@nyan.ece.neu.edu
-TEST_PATH = /home/xgong/m2c_unit_test/test/operator
 
 GPU = amdgcn
 GPUARCH = verde

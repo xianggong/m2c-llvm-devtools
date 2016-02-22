@@ -26,13 +26,14 @@ ifndef REMOTE_PATH
 $(error REMOTE_PATH is not set in Makefile.com)
 endif
 
-CURDIR = pwd
+CURDIR = $(shell pwd)
 
 amdRef: BasicDebug_Kernel2.cl
+	@-rm -f *.il *.i *.isa
 	@-$(AMDCC) $< >/dev/null 2>&1
-	@-rm *.il *.i
+	@-rm -f *.il *.i 
 	@-rename 's/_temp_0_Capeverde_//' *.isa
-	@-rm _temp_0*
+	@-rm -f _temp_0*
 
 ir: BasicDebug_Kernel2.cl
 	@-$(CLANG) $(CLANG_INC) $(CLANG_PAR) $< > log.0 2>&1 
@@ -42,27 +43,47 @@ irRef: BasicDebug_Kernel2.cl
 
 asm: ir
 	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug > log.1 2>&1
+	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --misched=si -o BasicDebug_Kernel2_sched.s > log.sched.1 2>&1
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug > log.1 2>&1
 
 asmpre2bin:
 	@-$(PRETOBIN) BasicDebug_Kernel2.s > log.2 2>&1
+	@-$(PRETOBIN) BasicDebug_Kernel2_sched.s > log.sched.2 2>&1
 
 asm2bin:
 	@-$(M2C) --si2bin BasicDebug_Kernel2.s > log.2 2>&1
+	@-$(M2C) --si2bin BasicDebug_Kernel2_sched.s > log.sched.2 2>&1
 
 2bingdb:
 	@-gdb --args $(M2C) --si2bin BasicDebug_Kernel2.s
 
 scpbin: 
 	@-scp BasicDebug_Kernel2.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BasicDebug
+	@-scp BasicDebug_Kernel2_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BasicDebug
 
 run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make run"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runsched"
+
+rundt: scpbin
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make rundt"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runscheddt"
+
+scale: scpbin
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make scale"
+
+runtrace: scpbin
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runtrace"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runschedtrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
+	@-gzip -d *.gz
 
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make isasched && scp debug.sched.isa xgong@$(MYIP):$(CURDIR)"
 
 asmcb1: ir
 	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --view-dag-combine1-dags > log.1 2>&1
@@ -104,4 +125,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) BasicDebug_Kernel2_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz
