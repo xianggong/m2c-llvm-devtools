@@ -47,6 +47,7 @@ asm: ir
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) MatrixMultiplication_Kernels.ll --disable-lsr --print-after-all --debug > log.1 2>&1
+	@-$(LLC) $(LLC_PAR) MatrixMultiplication_Kernels.ll --disable-lsr --print-after-all --debug --misched=si -o MatrixMultiplication_Kernels_sched.s > log.1 2>&1
 
 asmpre2bin:
 	@-$(PRETOBIN) MatrixMultiplication_Kernels.s > log.2 2>&1
