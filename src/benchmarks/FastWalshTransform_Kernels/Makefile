@@ -81,6 +81,9 @@ runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/FastWalshTransform; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
 
+runanalyse:
+	@-$(TRACEANALYSER) FastWalshTransform_Kernels -a FastWalshTransform_Kernels_sched 
+
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/FastWalshTransform; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/FastWalshTransform; make && make isasched && scp debug.sched.isa xgong@$(MYIP):$(CURDIR)"
@@ -125,4 +128,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) FastWalshTransform_Kernels_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz FastWalshTransform_Kernels FastWalshTransform_Kernels_sched

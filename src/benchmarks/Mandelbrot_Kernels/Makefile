@@ -81,6 +81,9 @@ runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/Mandelbrot; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
 
+runanalyse:
+	@-$(TRACEANALYSER) Mandelbrot_Kernels -a Mandelbrot_Kernels_sched 
+
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/Mandelbrot; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/Mandelbrot; make && make isasched && scp debug.sched.isa xgong@$(MYIP):$(CURDIR)"
@@ -125,4 +128,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) Mandelbrot_Kernels_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz Mandelbrot_Kernels Mandelbrot_Kernels_sched

@@ -81,6 +81,9 @@ runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholesDP; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
 
+runanalyse:
+	@-$(TRACEANALYSER) BlackScholesDP_Kernels -a BlackScholesDP_Kernels_sched 
+
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholesDP; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholesDP; make && make isasched && scp debug.sched.isa xgong@$(MYIP):$(CURDIR)"
@@ -125,4 +128,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) BlackScholesDP_Kernels_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz BlackScholesDP_Kernels BlackScholesDP_Kernels_sched

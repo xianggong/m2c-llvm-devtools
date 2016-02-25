@@ -11,6 +11,7 @@ CLANG = $(LLVM_ROOT)/clang
 LLC = $(LLVM_ROOT)/llc
 AMDCC = ../../../bin/amdcc
 PRETOBIN = ../../../bin/pretobin.sh
+TRACEANALYSER = ../../../bin/traceAnalyser.py
 
 GPU = amdgcn
 GPUARCH = verde

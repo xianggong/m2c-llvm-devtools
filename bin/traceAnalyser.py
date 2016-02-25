@@ -8,7 +8,7 @@ import re
 class Trace:
 
     def __init__(self, input_file):
-        # Read file
+        self.input_file_ = input_file
         self.trace_ = open(input_file, "r")
         self.is_cycle_range_set_ = False
         self.cycle_start_ = 0
@@ -19,15 +19,23 @@ class Trace:
         self.issue_ = {}
         self.branch_ = {}
         self.mem_new_access_ = {}
-        self.scalar_unit_ = {}
         self.mem_ = {}
-        self.simd_ = {}
         self.lds_ = {}
+        self.scalar_unit_ = {}
+        self.simd_ = {}
+
+        self.inst_ = {}
 
     def setCycleRange(self, cycle_start, cycle_end):
         self.is_cycle_range_set_ = True
         self.cycle_start_ = cycle_start
         self.cycle_end_ = cycle_end
+
+    def insertDic(self, dict, cycle_index):
+        count_in_cycle = 0
+        if cycle_index in dict:
+            count_in_cycle = dict[cycle_index]
+        dict[cycle_index] = count_in_cycle + 1
 
     def processData(self):
         if self.is_cycle_range_set_:
@@ -69,58 +77,69 @@ class Trace:
 
             # Processing data
             elif re.search('stg="s"', line):
-                count_in_cycle = 0
-                if cycle_index in self.stall_:
-                    count_in_cycle = self.stall_[cycle_index]
-                self.stall_[cycle_index] = count_in_cycle + 1
+                self.insertDic(self.stall_, cycle_index)
+                inst_id = int(
+                    re.search(' id=\d+', line).group(0).split('=')[1])
+                self.inst_[inst_id][4] += 1
 
             elif re.search('stg="f"', line):
-                count_in_cycle = 0
-                if cycle_index in self.fetch_:
-                    count_in_cycle = self.fetch_[cycle_index]
-                self.fetch_[cycle_index] = count_in_cycle + 1
+                self.insertDic(self.fetch_, cycle_index)
+                inst_id = int(
+                    re.search(' id=\d+', line).group(0).split('=')[1])
+                # list contains: 0 = start cycle
+                #                1 = whole count of cycles
+                #                2 = fetch cycles, default 4
+                #                3 = issue cycles
+                #                4 = stall cycles
+                #                5 = active cycles
+                #                6 = assembly
+                self.inst_[inst_id] = [cycle_index, 0, 4, 0, 0, 0, line]
 
             elif re.search('stg="i"', line):
-                count_in_cycle = 0
-                if cycle_index in self.issue_:
-                    count_in_cycle = self.issue_[cycle_index]
-                self.issue_[cycle_index] = count_in_cycle + 1
+                self.insertDic(self.issue_, cycle_index)
+                inst_id = int(
+                    re.search(' id=\d+', line).group(0).split('=')[1])
+                self.inst_[inst_id][3] += 1
 
             elif re.search('stg="bu', line):
-                count_in_cycle = 0
-                if cycle_index in self.branch_:
-                    count_in_cycle = self.branch_[cycle_index]
-                self.branch_[cycle_index] = count_in_cycle + 1
+                self.insertDic(self.branch_, cycle_index)
+                inst_id = int(
+                    re.search(' id=\d+', line).group(0).split('=')[1])
+                self.inst_[inst_id][5] += 1
 
             elif re.search('mem.new_access ', line):
-                count_in_cycle = 0
-                if cycle_index in self.mem_new_access_:
-                    count_in_cycle = self.mem_new_access_[cycle_index]
-                self.mem_new_access_[cycle_index] = count_in_cycle + 1
+                self.insertDic(self.mem_new_access_, cycle_index)
 
             elif re.search('stg="mem', line):
-                count_in_cycle = 0
-                if cycle_index in self.mem_:
-                    count_in_cycle = self.mem_[cycle_index]
-                self.mem_[cycle_index] = count_in_cycle + 1
+                self.insertDic(self.mem_, cycle_index)
 
             elif re.search('stg="su', line):
-                count_in_cycle = 0
-                if cycle_index in self.scalar_unit_:
-                    count_in_cycle = self.scalar_unit_[cycle_index]
-                self.scalar_unit_[cycle_index] = count_in_cycle + 1
+                self.insertDic(self.scalar_unit_, cycle_index)
+                inst_id = int(
+                    re.search(' id=\d+', line).group(0).split('=')[1])
+                self.inst_[inst_id][5] += 1
 
             elif re.search('stg="simd', line):
-                count_in_cycle = 0
-                if cycle_index in self.simd_:
-                    count_in_cycle = self.simd_[cycle_index]
-                self.simd_[cycle_index] = count_in_cycle + 1
+                self.insertDic(self.simd_, cycle_index)
+                inst_id = int(
+                    re.search(' id=\d+', line).group(0).split('=')[1])
+                self.inst_[inst_id][5] += 1
 
             elif re.search('stg="lds', line):
-                count_in_cycle = 0
-                if cycle_index in self.lds_:
-                    count_in_cycle = self.lds_[cycle_index]
-                self.lds_[cycle_index] = count_in_cycle + 1
+                self.insertDic(self.lds_, cycle_index)
+
+            # elif re.search('si.new_inst ', line):
+            #     inst_id = int(
+            #         re.search(' id=\d+', line).group(0).split('=')[1])
+            #     print "New inst: " + str(inst_id)
+            #     self.inst_[inst_id] = cycle_index
+
+            elif re.search('si.end_inst ', line):
+                inst_id = int(
+                    re.search(' id=\d+', line).group(0).split('=')[1])
+                inst_start_cycle = self.inst_[inst_id][0]
+                self.inst_[inst_id][1] = cycle_index - inst_start_cycle
+                # print self.inst_[inst_id]
 
     def getStatistics(self, dict, dict_name):
 
@@ -134,44 +153,44 @@ class Trace:
                 cycle_count += 1
         cycle_ratio = float(cycle_count) / float(self.cycle_count) * 100
 
-        print "  " + dict_name + " count = " + str(count)
-        print "  " + dict_name + " cycle ratio = " + str(cycle_ratio) + "%"
+        print("  %s\t\t%d\t%f" % (dict_name, count, cycle_ratio))
 
     def plotStatistics(self, dict, dict_name):
         plt.style.use('ggplot')
-        plt.plot(dict.keys(), dict.values())
-        plt.title(dict_name)
-        plt.show()
+        f, (ax0) = plt.subplots(1)
+        ax0.plot(dict.keys(), dict.values())
+        ax0.set_title(dict_name)
+        plt.draw()
 
     # Statistics getters
     def getStall(self):
-        self.getStatistics(self.stall_, "Stall")
+        self.getStatistics(self.stall_, "Stall ")
 
     def getFetch(self):
-        self.getStatistics(self.fetch_, "Fetch")
+        self.getStatistics(self.fetch_, "Fetch ")
 
     def getIssue(self):
-        self.getStatistics(self.issue_, "Issue")
+        self.getStatistics(self.issue_, "Issue ")
 
     def getBranch(self):
         self.getStatistics(self.branch_, "Branch")
 
     def getMemNewAccess(self):
-        self.getStatistics(self.mem_new_access_, "Mem New Access")
+        self.getStatistics(self.mem_new_access_, "NewAcc")
 
     def getMemAll(self):
-        self.getStatistics(self.mem_, "Mem")
+        self.getStatistics(self.mem_, "Mem   ")
 
     def getScalarUnit(self):
-        self.getStatistics(self.scalar_unit_, "Scalar Unit")
+        self.getStatistics(self.scalar_unit_, "Scalar")
 
     def getSIMD(self):
-        self.getStatistics(self.simd_, "SIMD")
+        self.getStatistics(self.simd_, "SIMD  ")
 
     def getLDS(self):
-        self.getStatistics(self.lds_, "LDS")
+        self.getStatistics(self.lds_, "LDS   ")
 
-    def getAll(self):
+    def getAllStats(self):
         print "Cycle " + str(self.cycle_start_) + " to " + str(self.cycle_end_)
         self.getStall()
         self.getFetch()
@@ -211,6 +230,13 @@ class Trace:
     def plotLDS(self):
         self.plotStatistics(self.lds_, "LDS")
 
+    def plotInstCycles(self):
+        plt.style.use('ggplot')
+        f, (ax0) = plt.subplots(1)
+        ax0.plot(self.inst_.keys(), self.inst_.values())
+        ax0.set_title("Inst cycles")
+        plt.draw()
+
     def plotAll(self):
         self.plotStall()
         self.plotFetch()
@@ -221,6 +247,51 @@ class Trace:
         self.plotScalarUnit()
         self.plotSIMD()
         self.plotLDS()
+
+
+class PlotCompare():
+
+    def __init__(self):
+        self.figure = 0
+
+    def plot(self, dict0, dict1, filename0, filename1, dict_name):
+        plt.style.use('ggplot')
+
+        f, (ax0, ax1, ax2) = plt.subplots(3, sharex=True, sharey=True)
+
+        # Trace 0
+        ax0.plot(dict0.keys(),
+                 dict0.values(),
+                 label=filename0,
+                 color=plt.rcParams['axes.color_cycle'][0])
+        ax0.set_title(dict_name + ": " + filename0)
+        ax0.legend()
+
+        # Trace 1
+        ax1.plot(dict1.keys(),
+                 dict1.values(),
+                 label=filename1,
+                 color=plt.rcParams['axes.color_cycle'][1])
+        ax1.set_title(dict_name + ": " + filename1)
+        ax1.legend()
+
+        # Both traces
+        ax2.plot(dict0.keys(),
+                 dict0.values(),
+                 label=filename0,
+                 color=plt.rcParams['axes.color_cycle'][0])
+        ax2.plot(dict1.keys(),
+                 dict1.values(),
+                 label=filename1,
+                 color=plt.rcParams['axes.color_cycle'][1])
+        ax2.set_title(dict_name + ": " + filename0 + " + " + filename1)
+        ax2.legend()
+
+        # Draw
+        plt.draw()
+
+    def show(self):
+        plt.show()
 
 
 def main():
@@ -244,47 +315,43 @@ def main():
         trace0.processData()
         trace1.processData()
 
-        trace0.getAll()
-        trace1.getAll()
+        trace0.getAllStats()
+        trace1.getAllStats()
 
-        trace0.plotAll()
-        trace1.plotAll()
+        # Compare results visually
+        pltcmp = PlotCompare()
 
-        plt.style.use('ggplot')
+        pltcmp.plot(trace0.stall_, trace1.stall_,
+                    trace0.input_file_, trace1.input_file_, "Stall")
 
-        # Trace 0
-        plt.subplot(3, 1, 1)
-        plt.plot(trace0.mem_new_access_.keys(),
-                 trace0.mem_new_access_.values(),
-                 label=args.traceFile,
-                 color=plt.rcParams['axes.color_cycle'][0])
-        plt.title("New Mem Access: " + args.traceFile)
-        plt.legend()
+        pltcmp.plot(trace0.fetch_, trace1.fetch_,
+                    trace0.input_file_, trace1.input_file_, "Fetch")
 
-        # Trace 1
-        plt.subplot(3, 1, 2)
-        plt.plot(trace1.mem_new_access_.keys(),
-                 trace1.mem_new_access_.values(),
-                 label=args.additional,
-                 color=plt.rcParams['axes.color_cycle'][1])
-        plt.title("New Mem Access: " + args.additional)
-        plt.legend()
+        pltcmp.plot(trace0.issue_, trace1.fetch_,
+                    trace0.input_file_, trace1.input_file_, "Issue")
 
-        # Both traces
-        plt.subplot(3, 1, 3)
-        plt.plot(trace0.mem_new_access_.keys(),
-                 trace0.mem_new_access_.values(),
-                 label=args.traceFile,
-                 color=plt.rcParams['axes.color_cycle'][0])
-        plt.plot(trace1.mem_new_access_.keys(),
-                 trace1.mem_new_access_.values(),
-                 label=args.additional,
-                 color=plt.rcParams['axes.color_cycle'][1])
-        plt.title("New Mem Access: " + args.traceFile +
-                  " + " + args.additional)
-        plt.legend()
+        pltcmp.plot(trace0.branch_, trace1.branch_,
+                    trace0.input_file_, trace1.input_file_, "Branch")
 
-        plt.show()
+        pltcmp.plot(trace0.mem_, trace1.mem_,
+                    trace0.input_file_, trace1.input_file_, "Mem")
+
+        pltcmp.plot(trace0.mem_new_access_, trace1.mem_new_access_,
+                    trace0.input_file_, trace1.input_file_, "Mem New Access")
+
+        pltcmp.plot(trace0.scalar_unit_, trace1.scalar_unit_,
+                    trace0.input_file_, trace1.input_file_, "Scalar Unit")
+
+        pltcmp.plot(trace0.simd_, trace1.simd_,
+                    trace0.input_file_, trace1.input_file_, "SIMD")
+
+        pltcmp.plot(trace0.lds_, trace1.lds_,
+                    trace0.input_file_, trace1.input_file_, "LDS")
+
+        # pltcmp.plot(trace0.inst_, trace1.inst_,
+        #             trace0.input_file_, trace1.input_file_, "Inst Cycle")
+
+        pltcmp.show()
 
     else:
         trace = Trace(args.traceFile)

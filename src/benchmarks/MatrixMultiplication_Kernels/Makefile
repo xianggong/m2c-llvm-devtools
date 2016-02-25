@@ -47,7 +47,6 @@ asm: ir
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) MatrixMultiplication_Kernels.ll --disable-lsr --print-after-all --debug > log.1 2>&1
-	@-$(LLC) $(LLC_PAR) MatrixMultiplication_Kernels.ll --disable-lsr --print-after-all --debug --misched=si -o MatrixMultiplication_Kernels_sched.s > log.1 2>&1
 
 asmpre2bin:
 	@-$(PRETOBIN) MatrixMultiplication_Kernels.s > log.2 2>&1
@@ -81,6 +80,9 @@ runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MatrixMultiplication; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MatrixMultiplication; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
+
+runanalyse:
+	@-$(TRACEANALYSER) MatrixMultiplication_Kernels -a MatrixMultiplication_Kernels_sched 
 
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MatrixMultiplication; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
@@ -126,4 +128,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) MatrixMultiplication_Kernels_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz MatrixMultiplication_Kernels MatrixMultiplication_Kernels_sched
