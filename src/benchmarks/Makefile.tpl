@@ -47,14 +47,19 @@ asm: ir
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) KERNEL_NAME.ll --disable-lsr --print-after-all --debug > log.1 2>&1
+	@-$(LLC) $(LLC_PAR) KERNEL_NAME.ll --disable-lsr --print-after-all --debug --misched=si -o KERNEL_NAME_sched.s > log.1 2>&1
+
+asmmerge:
+	@-$(KERNELMERGER) KERNEL_NAME.s KERNEL_NAME_sched.s > KERNEL_NAME_fusion.s
 
 asmpre2bin:
 	@-$(PRETOBIN) KERNEL_NAME.s > log.2 2>&1
 	@-$(PRETOBIN) KERNEL_NAME_sched.s > log.sched.2 2>&1
 
-asm2bin:
+asm2bin: asmmerge
 	@-$(M2C) --si2bin KERNEL_NAME.s > log.2 2>&1
 	@-$(M2C) --si2bin KERNEL_NAME_sched.s > log.sched.2 2>&1
+	@-$(M2C) --si2bin KERNEL_NAME_fusion.s > log.fusion.2 2>&1
 
 2bingdb:
 	@-gdb --args $(M2C) --si2bin KERNEL_NAME.s
@@ -62,14 +67,17 @@ asm2bin:
 scpbin: 
 	@-scp KERNEL_NAME.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/KERNEL_PATH
 	@-scp KERNEL_NAME_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/KERNEL_PATH
+	@-scp KERNEL_NAME_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/KERNEL_PATH
 
 run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; make && make run"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; make && make runsched"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; make && make runfusion"
 
 rundt: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; make && make rundt"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; make && make runscheddt"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; make && make runfusiondt"
 
 scale: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; make && make scale"
@@ -77,12 +85,18 @@ scale: scpbin
 runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; make && make runtrace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; make && make runschedtrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; make && make runfusiontrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
+	@-gzip -d *.gz
+
+rungettrace:
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
 
 runanalyse:
-	@-$(TRACEANALYSER) KERNEL_NAME -a KERNEL_NAME_sched 
+	@-$(TRACEANALYSER) KERNEL_NAME KERNEL_NAME_sched KERNEL_NAME_fusion
 
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/KERNEL_PATH; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
@@ -128,4 +142,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) KERNEL_NAME_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz KERNEL_NAME KERNEL_NAME_sched
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db KERNEL_NAME KERNEL_NAME_sched KERNEL_NAME_fusion

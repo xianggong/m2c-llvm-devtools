@@ -47,14 +47,19 @@ asm: ir
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) BlackScholes_Kernels.ll --disable-lsr --print-after-all --debug > log.1 2>&1
+	@-$(LLC) $(LLC_PAR) BlackScholes_Kernels.ll --disable-lsr --print-after-all --debug --misched=si -o BlackScholes_Kernels_sched.s > log.1 2>&1
+
+asmmerge:
+	@-$(KERNELMERGER) BlackScholes_Kernels.s BlackScholes_Kernels_sched.s > BlackScholes_Kernels_fusion.s
 
 asmpre2bin:
 	@-$(PRETOBIN) BlackScholes_Kernels.s > log.2 2>&1
 	@-$(PRETOBIN) BlackScholes_Kernels_sched.s > log.sched.2 2>&1
 
-asm2bin:
+asm2bin: asmmerge
 	@-$(M2C) --si2bin BlackScholes_Kernels.s > log.2 2>&1
 	@-$(M2C) --si2bin BlackScholes_Kernels_sched.s > log.sched.2 2>&1
+	@-$(M2C) --si2bin BlackScholes_Kernels_fusion.s > log.fusion.2 2>&1
 
 2bingdb:
 	@-gdb --args $(M2C) --si2bin BlackScholes_Kernels.s
@@ -62,14 +67,17 @@ asm2bin:
 scpbin: 
 	@-scp BlackScholes_Kernels.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BlackScholes
 	@-scp BlackScholes_Kernels_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BlackScholes
+	@-scp BlackScholes_Kernels_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BlackScholes
 
 run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; make && make run"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; make && make runsched"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; make && make runfusion"
 
 rundt: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; make && make rundt"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; make && make runscheddt"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; make && make runfusiondt"
 
 scale: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; make && make scale"
@@ -77,12 +85,18 @@ scale: scpbin
 runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; make && make runtrace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; make && make runschedtrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; make && make runfusiontrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
+	@-gzip -d *.gz
+
+rungettrace:
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
 
 runanalyse:
-	@-$(TRACEANALYSER) BlackScholes_Kernels -a BlackScholes_Kernels_sched 
+	@-$(TRACEANALYSER) BlackScholes_Kernels BlackScholes_Kernels_sched BlackScholes_Kernels_fusion
 
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholes; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
@@ -128,4 +142,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) BlackScholes_Kernels_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz BlackScholes_Kernels BlackScholes_Kernels_sched
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db BlackScholes_Kernels BlackScholes_Kernels_sched BlackScholes_Kernels_fusion

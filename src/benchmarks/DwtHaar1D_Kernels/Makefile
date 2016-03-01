@@ -47,14 +47,19 @@ asm: ir
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) DwtHaar1D_Kernels.ll --disable-lsr --print-after-all --debug > log.1 2>&1
+	@-$(LLC) $(LLC_PAR) DwtHaar1D_Kernels.ll --disable-lsr --print-after-all --debug --misched=si -o DwtHaar1D_Kernels_sched.s > log.1 2>&1
+
+asmmerge:
+	@-$(KERNELMERGER) DwtHaar1D_Kernels.s DwtHaar1D_Kernels_sched.s > DwtHaar1D_Kernels_fusion.s
 
 asmpre2bin:
 	@-$(PRETOBIN) DwtHaar1D_Kernels.s > log.2 2>&1
 	@-$(PRETOBIN) DwtHaar1D_Kernels_sched.s > log.sched.2 2>&1
 
-asm2bin:
+asm2bin: asmmerge
 	@-$(M2C) --si2bin DwtHaar1D_Kernels.s > log.2 2>&1
 	@-$(M2C) --si2bin DwtHaar1D_Kernels_sched.s > log.sched.2 2>&1
+	@-$(M2C) --si2bin DwtHaar1D_Kernels_fusion.s > log.fusion.2 2>&1
 
 2bingdb:
 	@-gdb --args $(M2C) --si2bin DwtHaar1D_Kernels.s
@@ -62,14 +67,17 @@ asm2bin:
 scpbin: 
 	@-scp DwtHaar1D_Kernels.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/DwtHaar1D
 	@-scp DwtHaar1D_Kernels_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/DwtHaar1D
+	@-scp DwtHaar1D_Kernels_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/DwtHaar1D
 
 run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; make && make run"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; make && make runsched"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; make && make runfusion"
 
 rundt: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; make && make rundt"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; make && make runscheddt"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; make && make runfusiondt"
 
 scale: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; make && make scale"
@@ -77,12 +85,18 @@ scale: scpbin
 runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; make && make runtrace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; make && make runschedtrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; make && make runfusiontrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
+	@-gzip -d *.gz
+
+rungettrace:
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
 
 runanalyse:
-	@-$(TRACEANALYSER) DwtHaar1D_Kernels -a DwtHaar1D_Kernels_sched 
+	@-$(TRACEANALYSER) DwtHaar1D_Kernels DwtHaar1D_Kernels_sched DwtHaar1D_Kernels_fusion
 
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/DwtHaar1D; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
@@ -128,4 +142,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) DwtHaar1D_Kernels_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz DwtHaar1D_Kernels DwtHaar1D_Kernels_sched
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db DwtHaar1D_Kernels DwtHaar1D_Kernels_sched DwtHaar1D_Kernels_fusion

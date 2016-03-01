@@ -47,14 +47,19 @@ asm: ir
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) ImageOverlap_Kernels.ll --disable-lsr --print-after-all --debug > log.1 2>&1
+	@-$(LLC) $(LLC_PAR) ImageOverlap_Kernels.ll --disable-lsr --print-after-all --debug --misched=si -o ImageOverlap_Kernels_sched.s > log.1 2>&1
+
+asmmerge:
+	@-$(KERNELMERGER) ImageOverlap_Kernels.s ImageOverlap_Kernels_sched.s > ImageOverlap_Kernels_fusion.s
 
 asmpre2bin:
 	@-$(PRETOBIN) ImageOverlap_Kernels.s > log.2 2>&1
 	@-$(PRETOBIN) ImageOverlap_Kernels_sched.s > log.sched.2 2>&1
 
-asm2bin:
+asm2bin: asmmerge
 	@-$(M2C) --si2bin ImageOverlap_Kernels.s > log.2 2>&1
 	@-$(M2C) --si2bin ImageOverlap_Kernels_sched.s > log.sched.2 2>&1
+	@-$(M2C) --si2bin ImageOverlap_Kernels_fusion.s > log.fusion.2 2>&1
 
 2bingdb:
 	@-gdb --args $(M2C) --si2bin ImageOverlap_Kernels.s
@@ -62,14 +67,17 @@ asm2bin:
 scpbin: 
 	@-scp ImageOverlap_Kernels.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/ImageOverlap
 	@-scp ImageOverlap_Kernels_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/ImageOverlap
+	@-scp ImageOverlap_Kernels_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/ImageOverlap
 
 run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; make && make run"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; make && make runsched"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; make && make runfusion"
 
 rundt: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; make && make rundt"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; make && make runscheddt"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; make && make runfusiondt"
 
 scale: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; make && make scale"
@@ -77,12 +85,18 @@ scale: scpbin
 runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; make && make runtrace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; make && make runschedtrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; make && make runfusiontrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
+	@-gzip -d *.gz
+
+rungettrace:
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
 
 runanalyse:
-	@-$(TRACEANALYSER) ImageOverlap_Kernels -a ImageOverlap_Kernels_sched 
+	@-$(TRACEANALYSER) ImageOverlap_Kernels ImageOverlap_Kernels_sched ImageOverlap_Kernels_fusion
 
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ImageOverlap; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
@@ -128,4 +142,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) ImageOverlap_Kernels_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz ImageOverlap_Kernels ImageOverlap_Kernels_sched
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db ImageOverlap_Kernels ImageOverlap_Kernels_sched ImageOverlap_Kernels_fusion

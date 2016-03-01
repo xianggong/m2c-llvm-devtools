@@ -47,14 +47,19 @@ asm: ir
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug > log.1 2>&1
+	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug --misched=si -o BasicDebug_Kernel2_sched.s > log.1 2>&1
+
+asmmerge:
+	@-$(KERNELMERGER) BasicDebug_Kernel2.s BasicDebug_Kernel2_sched.s > BasicDebug_Kernel2_fusion.s
 
 asmpre2bin:
 	@-$(PRETOBIN) BasicDebug_Kernel2.s > log.2 2>&1
 	@-$(PRETOBIN) BasicDebug_Kernel2_sched.s > log.sched.2 2>&1
 
-asm2bin:
+asm2bin: asmmerge
 	@-$(M2C) --si2bin BasicDebug_Kernel2.s > log.2 2>&1
 	@-$(M2C) --si2bin BasicDebug_Kernel2_sched.s > log.sched.2 2>&1
+	@-$(M2C) --si2bin BasicDebug_Kernel2_fusion.s > log.fusion.2 2>&1
 
 2bingdb:
 	@-gdb --args $(M2C) --si2bin BasicDebug_Kernel2.s
@@ -62,14 +67,17 @@ asm2bin:
 scpbin: 
 	@-scp BasicDebug_Kernel2.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BasicDebug
 	@-scp BasicDebug_Kernel2_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BasicDebug
+	@-scp BasicDebug_Kernel2_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BasicDebug
 
 run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make run"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runsched"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runfusion"
 
 rundt: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make rundt"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runscheddt"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runfusiondt"
 
 scale: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make scale"
@@ -77,12 +85,18 @@ scale: scpbin
 runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runtrace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runschedtrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runfusiontrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
+	@-gzip -d *.gz
+
+rungettrace:
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
 
 runanalyse:
-	@-$(TRACEANALYSER) BasicDebug_Kernel2 -a BasicDebug_Kernel2_sched 
+	@-$(TRACEANALYSER) BasicDebug_Kernel2 BasicDebug_Kernel2_sched BasicDebug_Kernel2_fusion
 
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
@@ -128,4 +142,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) BasicDebug_Kernel2_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz BasicDebug_Kernel2 BasicDebug_Kernel2_sched
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db BasicDebug_Kernel2 BasicDebug_Kernel2_sched BasicDebug_Kernel2_fusion

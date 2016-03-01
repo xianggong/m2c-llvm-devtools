@@ -47,14 +47,19 @@ asm: ir
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug > log.1 2>&1
+	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug --misched=si -o BufferImageInterop_kernels_sched.s > log.1 2>&1
+
+asmmerge:
+	@-$(KERNELMERGER) BufferImageInterop_kernels.s BufferImageInterop_kernels_sched.s > BufferImageInterop_kernels_fusion.s
 
 asmpre2bin:
 	@-$(PRETOBIN) BufferImageInterop_kernels.s > log.2 2>&1
 	@-$(PRETOBIN) BufferImageInterop_kernels_sched.s > log.sched.2 2>&1
 
-asm2bin:
+asm2bin: asmmerge
 	@-$(M2C) --si2bin BufferImageInterop_kernels.s > log.2 2>&1
 	@-$(M2C) --si2bin BufferImageInterop_kernels_sched.s > log.sched.2 2>&1
+	@-$(M2C) --si2bin BufferImageInterop_kernels_fusion.s > log.fusion.2 2>&1
 
 2bingdb:
 	@-gdb --args $(M2C) --si2bin BufferImageInterop_kernels.s
@@ -62,14 +67,17 @@ asm2bin:
 scpbin: 
 	@-scp BufferImageInterop_kernels.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BufferImageInterop
 	@-scp BufferImageInterop_kernels_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BufferImageInterop
+	@-scp BufferImageInterop_kernels_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BufferImageInterop
 
 run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make run"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runsched"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runfusion"
 
 rundt: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make rundt"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runscheddt"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runfusiondt"
 
 scale: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make scale"
@@ -77,12 +85,18 @@ scale: scpbin
 runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runtrace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runschedtrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runfusiontrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
+	@-gzip -d *.gz
+
+rungettrace:
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
 
 runanalyse:
-	@-$(TRACEANALYSER) BufferImageInterop_kernels -a BufferImageInterop_kernels_sched 
+	@-$(TRACEANALYSER) BufferImageInterop_kernels BufferImageInterop_kernels_sched BufferImageInterop_kernels_fusion
 
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
@@ -128,4 +142,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) BufferImageInterop_kernels_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz BufferImageInterop_kernels BufferImageInterop_kernels_sched
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db BufferImageInterop_kernels BufferImageInterop_kernels_sched BufferImageInterop_kernels_fusion

@@ -47,14 +47,19 @@ asm: ir
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) TransferOverlap_Kernels.ll --disable-lsr --print-after-all --debug > log.1 2>&1
+	@-$(LLC) $(LLC_PAR) TransferOverlap_Kernels.ll --disable-lsr --print-after-all --debug --misched=si -o TransferOverlap_Kernels_sched.s > log.1 2>&1
+
+asmmerge:
+	@-$(KERNELMERGER) TransferOverlap_Kernels.s TransferOverlap_Kernels_sched.s > TransferOverlap_Kernels_fusion.s
 
 asmpre2bin:
 	@-$(PRETOBIN) TransferOverlap_Kernels.s > log.2 2>&1
 	@-$(PRETOBIN) TransferOverlap_Kernels_sched.s > log.sched.2 2>&1
 
-asm2bin:
+asm2bin: asmmerge
 	@-$(M2C) --si2bin TransferOverlap_Kernels.s > log.2 2>&1
 	@-$(M2C) --si2bin TransferOverlap_Kernels_sched.s > log.sched.2 2>&1
+	@-$(M2C) --si2bin TransferOverlap_Kernels_fusion.s > log.fusion.2 2>&1
 
 2bingdb:
 	@-gdb --args $(M2C) --si2bin TransferOverlap_Kernels.s
@@ -62,14 +67,17 @@ asm2bin:
 scpbin: 
 	@-scp TransferOverlap_Kernels.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/TransferOverlap
 	@-scp TransferOverlap_Kernels_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/TransferOverlap
+	@-scp TransferOverlap_Kernels_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/TransferOverlap
 
 run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; make && make run"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; make && make runsched"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; make && make runfusion"
 
 rundt: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; make && make rundt"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; make && make runscheddt"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; make && make runfusiondt"
 
 scale: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; make && make scale"
@@ -77,12 +85,18 @@ scale: scpbin
 runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; make && make runtrace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; make && make runschedtrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; make && make runfusiontrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
+	@-gzip -d *.gz
+
+rungettrace:
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
 
 runanalyse:
-	@-$(TRACEANALYSER) TransferOverlap_Kernels -a TransferOverlap_Kernels_sched 
+	@-$(TRACEANALYSER) TransferOverlap_Kernels TransferOverlap_Kernels_sched TransferOverlap_Kernels_fusion
 
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
@@ -128,4 +142,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) TransferOverlap_Kernels_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz TransferOverlap_Kernels TransferOverlap_Kernels_sched
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db TransferOverlap_Kernels TransferOverlap_Kernels_sched TransferOverlap_Kernels_fusion

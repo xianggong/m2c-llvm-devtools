@@ -12,6 +12,7 @@ LLC = $(LLVM_ROOT)/llc
 AMDCC = ../../../bin/amdcc
 PRETOBIN = ../../../bin/pretobin.sh
 TRACEANALYSER = ../../../bin/traceAnalyser.py
+KERNELMERGER = ../../../bin/kernelMerger.py
 
 GPU = amdgcn
 GPUARCH = verde

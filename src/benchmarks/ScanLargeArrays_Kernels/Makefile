@@ -47,14 +47,19 @@ asm: ir
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) ScanLargeArrays_Kernels.ll --disable-lsr --print-after-all --debug > log.1 2>&1
+	@-$(LLC) $(LLC_PAR) ScanLargeArrays_Kernels.ll --disable-lsr --print-after-all --debug --misched=si -o ScanLargeArrays_Kernels_sched.s > log.1 2>&1
+
+asmmerge:
+	@-$(KERNELMERGER) ScanLargeArrays_Kernels.s ScanLargeArrays_Kernels_sched.s > ScanLargeArrays_Kernels_fusion.s
 
 asmpre2bin:
 	@-$(PRETOBIN) ScanLargeArrays_Kernels.s > log.2 2>&1
 	@-$(PRETOBIN) ScanLargeArrays_Kernels_sched.s > log.sched.2 2>&1
 
-asm2bin:
+asm2bin: asmmerge
 	@-$(M2C) --si2bin ScanLargeArrays_Kernels.s > log.2 2>&1
 	@-$(M2C) --si2bin ScanLargeArrays_Kernels_sched.s > log.sched.2 2>&1
+	@-$(M2C) --si2bin ScanLargeArrays_Kernels_fusion.s > log.fusion.2 2>&1
 
 2bingdb:
 	@-gdb --args $(M2C) --si2bin ScanLargeArrays_Kernels.s
@@ -62,14 +67,17 @@ asm2bin:
 scpbin: 
 	@-scp ScanLargeArrays_Kernels.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/ScanLargeArrays
 	@-scp ScanLargeArrays_Kernels_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/ScanLargeArrays
+	@-scp ScanLargeArrays_Kernels_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/ScanLargeArrays
 
 run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; make && make run"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; make && make runsched"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; make && make runfusion"
 
 rundt: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; make && make rundt"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; make && make runscheddt"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; make && make runfusiondt"
 
 scale: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; make && make scale"
@@ -77,12 +85,18 @@ scale: scpbin
 runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; make && make runtrace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; make && make runschedtrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; make && make runfusiontrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
+	@-gzip -d *.gz
+
+rungettrace:
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
 
 runanalyse:
-	@-$(TRACEANALYSER) ScanLargeArrays_Kernels -a ScanLargeArrays_Kernels_sched 
+	@-$(TRACEANALYSER) ScanLargeArrays_Kernels ScanLargeArrays_Kernels_sched ScanLargeArrays_Kernels_fusion
 
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/ScanLargeArrays; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
@@ -128,4 +142,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) ScanLargeArrays_Kernels_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz ScanLargeArrays_Kernels ScanLargeArrays_Kernels_sched
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db ScanLargeArrays_Kernels ScanLargeArrays_Kernels_sched ScanLargeArrays_Kernels_fusion

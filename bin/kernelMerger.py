@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import argparse
-import re
 
 
 class Kernel:
@@ -27,13 +26,7 @@ class Kernel:
 
     # Overload == operator
     def __eq__(self, other):
-        is_equal = False
-        is_equal = len(self.funcs_) == len(other.funcs_)
-        # for func_index in len(self.funcs_):
-        #     is_same_func = self.funcs_[
-        #         func_index].func_name_ == other.funcs_[func_index].func_name_
-        #     is_equal = is_equal and is_same_func
-        return is_equal
+        return len(self.funcs_) == len(other.funcs_)
 
     def dump(self):
         for index in range(len(self.funcs_)):
@@ -47,12 +40,6 @@ class KernelFunc:
             self.raw_text_ = raw_text
         else:
             self.raw_text_ = ""
-
-        # .global KERNEL_FUNCTION_NAME
-        # for line in self.raw_text_.splitlines():
-        #     m = re.search('\.global (?P<funcN>\w+)', line)
-        #     self.func_name_ = m.group('funcN')
-        #     continue
 
         # Each kernel function has 4 sections
         self.sections_ = ["", "", "", ""]
@@ -93,6 +80,7 @@ class KernelMerger:
         self.merged_kernel = Kernel()
 
     def mergeKernel(self, kernel0, kernel1):
+        # Make sure contains same amount of kernel functions
         assert(kernel0 == kernel1)
 
         for index in range(len(kernel0.funcs_)):
@@ -110,20 +98,22 @@ class KernelMerger:
         kernel_func_merged.globl_section_ = kernelFunc0.globl_section_
         kernel_func_merged.text_section_ = kernelFunc0.text_section_
         kernel_func_merged.args_section_ = kernelFunc0.args_section_
-        kernel_func_merged.metadata_section_ = kernelFunc0.metadata_section_
+        # Warning when metadata section doesn't match
+        if kernelFunc0.metadata_section_ != kernelFunc1.metadata_section_:
+            kernel_func_merged.metadata_section_ += \
+                "// Merge warning: sections do not match\n"
+        kernel_func_merged.metadata_section_ += kernelFunc0.metadata_section_
 
         # Ignore first 3 lines
-        count = 0
-        text_section = "// ********************* Another kernel starts\n"
+        text_section = "// ********************* Second kernel starts\n"
         for line in kernelFunc1.text_section_.splitlines():
-            if count > 2:
+            if "entry" in line:
                 text_section += line + "\n"
-            count += 1
 
         # To avoid branch to wrong label
         text_section = text_section.replace("BB", "SKBB")
-        # print text_section
 
+        # print text_section
         kernel_func_merged.text_section_ += text_section
 
         # Return

@@ -47,14 +47,19 @@ asm: ir
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug > log.1 2>&1
+	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug --misched=si -o VectorAddition_Kernel_sched.s > log.1 2>&1
+
+asmmerge:
+	@-$(KERNELMERGER) VectorAddition_Kernel.s VectorAddition_Kernel_sched.s > VectorAddition_Kernel_fusion.s
 
 asmpre2bin:
 	@-$(PRETOBIN) VectorAddition_Kernel.s > log.2 2>&1
 	@-$(PRETOBIN) VectorAddition_Kernel_sched.s > log.sched.2 2>&1
 
-asm2bin:
+asm2bin: asmmerge
 	@-$(M2C) --si2bin VectorAddition_Kernel.s > log.2 2>&1
 	@-$(M2C) --si2bin VectorAddition_Kernel_sched.s > log.sched.2 2>&1
+	@-$(M2C) --si2bin VectorAddition_Kernel_fusion.s > log.fusion.2 2>&1
 
 2bingdb:
 	@-gdb --args $(M2C) --si2bin VectorAddition_Kernel.s
@@ -62,14 +67,17 @@ asm2bin:
 scpbin: 
 	@-scp VectorAddition_Kernel.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/VectorAddition
 	@-scp VectorAddition_Kernel_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/VectorAddition
+	@-scp VectorAddition_Kernel_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/VectorAddition
 
 run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make run"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runsched"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runfusion"
 
 rundt: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make rundt"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runscheddt"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runfusiondt"
 
 scale: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make scale"
@@ -77,12 +85,18 @@ scale: scpbin
 runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runtrace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runschedtrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runfusiontrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
+	@-gzip -d *.gz
+
+rungettrace:
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
 
 runanalyse:
-	@-$(TRACEANALYSER) VectorAddition_Kernel -a VectorAddition_Kernel_sched 
+	@-$(TRACEANALYSER) VectorAddition_Kernel VectorAddition_Kernel_sched VectorAddition_Kernel_fusion
 
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
@@ -128,4 +142,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) VectorAddition_Kernel_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz VectorAddition_Kernel VectorAddition_Kernel_sched
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db VectorAddition_Kernel VectorAddition_Kernel_sched VectorAddition_Kernel_fusion

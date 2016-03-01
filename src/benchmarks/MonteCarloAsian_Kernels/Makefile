@@ -47,14 +47,19 @@ asm: ir
 
 asmlsroff: ir
 	@-$(LLC) $(LLC_PAR) MonteCarloAsian_Kernels.ll --disable-lsr --print-after-all --debug > log.1 2>&1
+	@-$(LLC) $(LLC_PAR) MonteCarloAsian_Kernels.ll --disable-lsr --print-after-all --debug --misched=si -o MonteCarloAsian_Kernels_sched.s > log.1 2>&1
+
+asmmerge:
+	@-$(KERNELMERGER) MonteCarloAsian_Kernels.s MonteCarloAsian_Kernels_sched.s > MonteCarloAsian_Kernels_fusion.s
 
 asmpre2bin:
 	@-$(PRETOBIN) MonteCarloAsian_Kernels.s > log.2 2>&1
 	@-$(PRETOBIN) MonteCarloAsian_Kernels_sched.s > log.sched.2 2>&1
 
-asm2bin:
+asm2bin: asmmerge
 	@-$(M2C) --si2bin MonteCarloAsian_Kernels.s > log.2 2>&1
 	@-$(M2C) --si2bin MonteCarloAsian_Kernels_sched.s > log.sched.2 2>&1
+	@-$(M2C) --si2bin MonteCarloAsian_Kernels_fusion.s > log.fusion.2 2>&1
 
 2bingdb:
 	@-gdb --args $(M2C) --si2bin MonteCarloAsian_Kernels.s
@@ -62,14 +67,17 @@ asm2bin:
 scpbin: 
 	@-scp MonteCarloAsian_Kernels.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/MonteCarloAsian
 	@-scp MonteCarloAsian_Kernels_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/MonteCarloAsian
+	@-scp MonteCarloAsian_Kernels_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/MonteCarloAsian
 
 run: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; make && make run"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; make && make runsched"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; make && make runfusion"
 
 rundt: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; make && make rundt"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; make && make runscheddt"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; make && make runfusiondt"
 
 scale: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; make && make scale"
@@ -77,12 +85,18 @@ scale: scpbin
 runtrace: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; make && make runtrace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; make && make runschedtrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; make && make runfusiontrace" 
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
+	@-gzip -d *.gz
+
+rungettrace:
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
 	@-gzip -d *.gz
 
 runanalyse:
-	@-$(TRACEANALYSER) MonteCarloAsian_Kernels -a MonteCarloAsian_Kernels_sched 
+	@-$(TRACEANALYSER) MonteCarloAsian_Kernels MonteCarloAsian_Kernels_sched MonteCarloAsian_Kernels_fusion
 
 runisa: scpbin
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsian; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
@@ -128,4 +142,4 @@ gdbRef: irRef
 	gdb --args $(LLC) $(LLC_PAR) MonteCarloAsian_Kernels_ref.ll --print-after-all --debug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz MonteCarloAsian_Kernels MonteCarloAsian_Kernels_sched
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db MonteCarloAsian_Kernels MonteCarloAsian_Kernels_sched MonteCarloAsian_Kernels_fusion
