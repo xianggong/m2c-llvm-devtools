@@ -6,11 +6,10 @@ import re
 import random
 import sqlite3
 import time
+
 import pandas as pd
-from bokeh.charts import Horizon
-from bokeh.io import output_file, show, vplot
-from bokeh.plotting import figure
-from bokeh.models import Range1d
+from bokeh.plotting import figure, show, output_file
+from bokeh.io import vplot
 
 
 class pp():
@@ -450,6 +449,8 @@ class Traces():
 
         self.trace_files = trace_files
         self.traces = []
+        self.plot_width = 1560
+        self.plot_height = 400
 
         for trace in trace_files:
             t = Trace(trace)
@@ -459,70 +460,60 @@ class Traces():
         for trace in self.traces:
             trace.getAllCount()
 
-    def plot(self, table_name, column_name):
+    def plot(self, table_name, x_column_name, y_column_name):
 
         # Output to static HTML file
-        output_file(column_name + '.html')
+        output_file(y_column_name + x_column_name + '.html')
 
+        # List of figures
         figures = []
 
         # Set y axis range
         x_max = 0
         y_max = 0
         for trace in self.traces:
-            x_max = max(trace.getMax(table_name, column_name), x_max)
-            y_max = max(trace.getMax(table_name, column_name), y_max)
+            x_max = max(trace.getMax(table_name, x_column_name), x_max)
+            y_max = max(trace.getMax(table_name, y_column_name), y_max)
+        x_max *= 1.01
+        y_max *= 1.05
+
+        # Plotting
+        all_in_one = figure(webgl=True,
+                            plot_width=self.plot_width,
+                            plot_height=self.plot_height,
+                            x_range=(0, x_max),
+                            y_range=(0, y_max),
+                            title='Combined view')
+        all_in_one.xaxis.axis_label = x_column_name
+        all_in_one.yaxis.axis_label = "# of " + y_column_name
 
         for trace in self.traces:
-            # f = figure(webgl=True, plot_width=1580, plot_height=400,
-            #            x_range=(0, x_max), y_range=(0, y_max),
-            #            title=trace._file_name)
-            # f.ray(trace._cycle_view[name].keys(),
-            #       trace._cycle_view[name].values(),
-            #       length=y_max,
-            #       angle=270,
-            #       angle_units="deg",
-            #       color=c,
-            #       line_width=2)
-            # f.line(trace._cycle_view[name].keys(),
-            #        trace._cycle_view[name].values(),
-            #        color=c,
-            #        line_width=2)
-            # f.circle(trace._cycle_view[name].keys(),
-            #          trace._cycle_view[name].values(),
-            #          color=trace._color,
-            #          size=5)
-            # figures.append(f)
-            db = sqlite3.connect(trace._file_name + '.db')
-            sql_query = 'SELECT ' + column_name + ' FROM ' + table_name
-            df = pd.read_sql_query(sql_query, db)
+            sql_query = 'SELECT ' + x_column_name + ',' + y_column_name + \
+                ' FROM ' + table_name
+            df = pd.read_sql_query(sql_query, trace._database)
 
-            hp = Horizon(df, plot_width=1580, plot_height=400,
-                         x_range=Range1d(0, x_max), y_range=Range1d(0, y_max),
-                         color=trace._color,
-                         title=trace._file_name)
-            figures.append(hp)
+            plot = figure(webgl=True,
+                          plot_width=self.plot_width,
+                          plot_height=self.plot_height,
+                          x_range=(0, x_max),
+                          y_range=(0, y_max),
+                          title=trace._file_name)
+            plot.xaxis.axis_label = x_column_name
+            plot.yaxis.axis_label = "# of " + y_column_name
 
-        # combined = figure(webgl=True, plot_width=1580, plot_height=400,
-        #                   x_range=(0, x_max), y_range=(0, y_max),
-        #                   title='Combined view')
-        # for trace in self.traces:
-        #     # combined.ray(trace._cycle_view[name].keys(),
-        #     #              trace._cycle_view[name].values(),
-        #     #              length=y_max,
-        #     #              angle=270,
-        #     #              angle_units="deg",
-        #     #              color=colors[index],
-        #     #              line_width=2)
-        #     # combined.line(trace._cycle_view[name].keys(),
-        #     #               trace._cycle_view[name].values(),
-        #     #               color=colors[index],
-        #     #               line_width=2)
-        #     combined.circle(trace._cycle_view[name].keys(),
-        #                     trace._cycle_view[name].values(),
-        #                     color=trace._color,
-        #                     size=5)
-        # figures.append(combined)
+            plot.circle(df[x_column_name],
+                        df[y_column_name],
+                        color=trace._color,
+                        size=5)
+
+            all_in_one.circle(df[x_column_name],
+                              df[y_column_name],
+                              color=trace._color,
+                              size=5)
+
+            figures.append(plot)
+
+        figures.append(all_in_one)
 
         # Plot all figures
         p = vplot(*figures)
@@ -535,12 +526,32 @@ def main():
         description='Multi2Sim simulation trace analyzer')
     parser.add_argument('traceFiles', nargs='+',
                         help='Uncompressed Multi2Sim trace file')
-
+    parser.add_argument("-t", "--table", nargs=1,
+                        default="cycle",
+                        help='Choose table name')
+    parser.add_argument("-x", "--xaxis", nargs=1,
+                        default="cycle",
+                        help='Choose x axis statistic name')
+    parser.add_argument("-y", "--yaxis", nargs=1,
+                        default="stall",
+                        help='Choose y axis statistic name')
+    parser.add_argument("-s", "--stat",
+                        action="store_true",
+                        help='Show statistics')
+    parser.add_argument("-v", "--visual",
+                        action="store_true",
+                        help='Visualize statistics')
     args = parser.parse_args()
 
+    # Traces
     traces = Traces(args.traceFiles)
-    traces.stat()
-    traces.plot('cycle', 'stall')
+
+    # Statistics
+    if args.stat:
+        traces.stat()
+
+    if args.visual:
+        traces.plot(args.table[0], args.xaxis[0], args.yaxis[0])
 
 if __name__ == '__main__':
     main()
