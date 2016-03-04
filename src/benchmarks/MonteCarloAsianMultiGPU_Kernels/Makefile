@@ -91,9 +91,10 @@ runtrace: scpbin
 	@-gzip -d *.gz
 
 rungettrace:
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsianMultiGPU; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsianMultiGPU; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
-	@-gzip -d *.gz
+	@-mkdir trace
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsianMultiGPU; scp -r *.rpt xgong@$(MYIP):$(CURDIR)/trace"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MonteCarloAsianMultiGPU; scp -r *.gz xgong@$(MYIP):$(CURDIR)/trace"
+	@-cd trace && gzip -d *.gz
 
 runanalyse:
 	@-$(TRACEANALYSER) MonteCarloAsianMultiGPU_Kernels MonteCarloAsianMultiGPU_Kernels_sched MonteCarloAsianMultiGPU_Kernels_fusion

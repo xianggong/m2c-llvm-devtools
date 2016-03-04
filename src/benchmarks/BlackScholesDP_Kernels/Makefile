@@ -91,9 +91,10 @@ runtrace: scpbin
 	@-gzip -d *.gz
 
 rungettrace:
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholesDP; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholesDP; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
-	@-gzip -d *.gz
+	@-mkdir trace
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholesDP; scp -r *.rpt xgong@$(MYIP):$(CURDIR)/trace"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BlackScholesDP; scp -r *.gz xgong@$(MYIP):$(CURDIR)/trace"
+	@-cd trace && gzip -d *.gz
 
 runanalyse:
 	@-$(TRACEANALYSER) BlackScholesDP_Kernels BlackScholesDP_Kernels_sched BlackScholesDP_Kernels_fusion

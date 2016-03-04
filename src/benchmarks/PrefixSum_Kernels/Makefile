@@ -91,9 +91,10 @@ runtrace: scpbin
 	@-gzip -d *.gz
 
 rungettrace:
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/PrefixSum; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/PrefixSum; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
-	@-gzip -d *.gz
+	@-mkdir trace
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/PrefixSum; scp -r *.rpt xgong@$(MYIP):$(CURDIR)/trace"
+	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/PrefixSum; scp -r *.gz xgong@$(MYIP):$(CURDIR)/trace"
+	@-cd trace && gzip -d *.gz
 
 runanalyse:
 	@-$(TRACEANALYSER) PrefixSum_Kernels PrefixSum_Kernels_sched PrefixSum_Kernels_fusion
