@@ -106,8 +106,11 @@ class KernelMerger:
 
         # Ignore first 3 lines
         text_section = "// ********************* Second kernel starts\n"
+        start_append = False
         for line in kernelFunc1.text_section_.splitlines():
             if "entry" in line:
+                start_append = True
+            if start_append:
                 text_section += line + "\n"
 
         # To avoid branch to wrong label

@@ -8,6 +8,7 @@ import sqlite3
 import time
 
 import pandas as pd
+from bokeh.models import HoverTool
 from bokeh.plotting import figure, show, output_file
 from bokeh.io import vplot
 
@@ -62,8 +63,8 @@ class Trace:
         self._file_name = file_name
         self._trace = open(file_name, "r")
 
+        # Try to load database if there is one
         self._database = None
-        # Check if there is already an .db for the trace
         if os.path.isfile(self._file_name + ".db"):
             db = sqlite3.connect(self._file_name + '.db')
             c = db.cursor()
@@ -72,15 +73,24 @@ class Trace:
             db_mtime = c.execute('SELECT mtime FROM misc').fetchone()[0]
             trace_ctime = str(time.ctime(os.path.getctime(self._file_name)))
             trace_mtime = str(time.ctime(os.path.getmtime(self._file_name)))
+            # Load if it is the one for the trace
             if db_ctime == trace_ctime and db_mtime == trace_mtime \
                     and db_name == self._file_name:
                 self._database = sqlite3.connect(self._file_name + '.db')
                 self._database_ready = True
+            # Outdated database, waiting for users to take action
             else:
+                # Build new one or use the outdated one
                 is_delete = raw_input(
-                    self._file_name + ".db outdated, update? [Y]/N: ")
+                    self._file_name + ".db outdated, remove it? [Y]/N: ")
                 if is_delete == '' or is_delete == 'Y':
                     os.remove(self._file_name + '.db')
+                    self._data_ready = False
+                    self._database_ready = False
+                else:
+                    print "Using outdated database"
+                    self._database = sqlite3.connect(self._file_name + '.db')
+                    self._database_ready = True
 
         self._color = "#%06x" % random.randint(0, 0xFFFFFF)
 
@@ -410,37 +420,55 @@ class Trace:
 
         return c.execute(sql_query)
 
-    def getMax(self, table_name, column_name):
+    def getMax(self, table_name, column_name, conditions=''):
         if self._database is None:
             self.buildDatabase()
 
         c = self._database.cursor()
-        sql_query = 'SELECT Max(' + column_name + ') FROM ' + table_name
+        sql_query = 'SELECT Max(' + column_name + ') FROM ' + table_name + ' '
+        sql_query += conditions
         max_val = c.execute(sql_query).fetchone()[0]
 
         return int(max_val)
 
-    def getCount(self, table_name, column_name):
+    def getSum(self, table_name, column_name, conditions=''):
         if self._database is None:
             self.buildDatabase()
 
         c = self._database.cursor()
-        sql_query = 'SELECT SUM(' + column_name + ') FROM ' + table_name
+        sql_query = 'SELECT SUM(' + column_name + ') FROM ' + table_name + ' '
+        sql_query += conditions
+        col_sum = c.execute(sql_query).fetchone()[0]
+
+        return column_name + '\t\t\t' + str(col_sum)
+
+    def getCount(self, table_name, column_name, conditions=''):
+        if self._database is None:
+            self.buildDatabase()
+
+        c = self._database.cursor()
+        sql_query = 'SELECT COUNT(' + column_name + \
+            ') FROM ' + table_name + ' '
+        sql_query += conditions
         count = c.execute(sql_query).fetchone()[0]
 
-        return column_name + '\t\t\t' + str(count)
+        return int(count)
 
     def getAllCount(self):
-        print "Cycle " + str(self._cycle_start) + " to " + str(self._cycle_end)
-        print self.getCount('cycle', 'stall')
-        print self.getCount('cycle', 'fetch')
-        print self.getCount('cycle', 'issue')
-        print self.getCount('cycle', 'branch')
-        print self.getCount('cycle', 'mem_new')
-        print self.getCount('cycle', 'mem')
-        print self.getCount('cycle', 'lds')
-        print self.getCount('cycle', 'scalar')
-        print self.getCount('cycle', 'simd')
+        if self._is_cycle_range_set:
+            print "Cycle " + str(self._cycle_start) + \
+                " to " + str(self._cycle_end)
+        else:
+            print "Cycle 0 to " + str(self.getMax("cycle", "cycle"))
+        print self.getSum('cycle', 'stall')
+        print self.getSum('cycle', 'fetch')
+        print self.getSum('cycle', 'issue')
+        print self.getSum('cycle', 'branch')
+        print self.getSum('cycle', 'mem_new')
+        print self.getSum('cycle', 'mem')
+        print self.getSum('cycle', 'lds')
+        print self.getSum('cycle', 'scalar')
+        print self.getSum('cycle', 'simd')
 
 
 class Traces():
@@ -485,31 +513,151 @@ class Traces():
                             y_range=(0, y_max),
                             title='Combined view')
         all_in_one.xaxis.axis_label = x_column_name
-        all_in_one.yaxis.axis_label = "# of " + y_column_name
+        all_in_one.yaxis.axis_label = y_column_name
 
         for trace in self.traces:
             sql_query = 'SELECT ' + x_column_name + ',' + y_column_name + \
                 ' FROM ' + table_name
             df = pd.read_sql_query(sql_query, trace._database)
 
+            plot_title = trace._file_name + " : " + \
+                str(trace.getMax("cycle", "cycle")) + " cycles"
             plot = figure(webgl=True,
                           plot_width=self.plot_width,
                           plot_height=self.plot_height,
-                          x_range=(0, x_max),
-                          y_range=(0, y_max),
-                          title=trace._file_name)
+                          x_range=all_in_one.x_range,
+                          y_range=all_in_one.y_range,
+                          title=plot_title)
             plot.xaxis.axis_label = x_column_name
-            plot.yaxis.axis_label = "# of " + y_column_name
+            plot.yaxis.axis_label = y_column_name
 
-            plot.circle(df[x_column_name],
-                        df[y_column_name],
-                        color=trace._color,
-                        size=5)
+            plot.segment(x0=df[x_column_name],
+                         y0=df[y_column_name],
+                         x1=df[x_column_name],
+                         y1=0,
+                         line_width=1,
+                         legend=trace._file_name,
+                         color=trace._color)
 
-            all_in_one.circle(df[x_column_name],
-                              df[y_column_name],
-                              color=trace._color,
-                              size=5)
+            all_in_one.segment(x0=df[x_column_name],
+                               y0=df[y_column_name],
+                               x1=df[x_column_name],
+                               y1=0,
+                               line_width=1,
+                               legend=trace._file_name,
+                               color=trace._color)
+
+            # plot.circle(df[x_column_name],
+            #             df[y_column_name],
+            #             legend=trace._file_name,
+            #             color=trace._color,
+            #             size=5)
+
+            # all_in_one.circle(df[x_column_name],
+            #                   df[y_column_name],
+            #                   legend=trace._file_name,
+            #                   color=trace._color,
+            #                   size=5)
+
+            figures.append(plot)
+
+        figures.append(all_in_one)
+
+        # Plot all figures
+        p = vplot(*figures)
+        show(p)
+
+    def plotPipeline(self, cu_id):
+
+        # Output to static HTML file
+        if int(cu_id) != -1:
+            output_file('pipeline_cu' + cu_id + '.html')
+        else:
+            output_file('pipeline_all_cu.html')
+
+        # List of figures
+        figures = []
+
+        # Set y axis range
+        x_max = 1
+        y_max = 1
+        for trace in self.traces:
+            if int(cu_id) != -1:
+                condition = 'WHERE cu=' + cu_id
+                x_max = max(trace.getMax(
+                    "inst", "cycle_start + length", condition), x_max)
+                y_max = max(trace.getCount("inst", "line", condition), y_max)
+            else:
+                x_max = max(trace.getMax(
+                    "inst", "cycle_start + length"), x_max)
+                y_max = max(trace.getCount("inst", "line"), y_max)
+        x_max *= 1.01
+        y_max *= 1.05
+
+        # Plotting
+        all_in_one = figure(webgl=True,
+                            plot_width=self.plot_width,
+                            plot_height=self.plot_height,
+                            x_range=(0, x_max),
+                            y_range=(0, y_max),
+                            title='Combined view')
+        all_in_one.xaxis.axis_label = "cycle"
+        all_in_one.yaxis.axis_label = "inst_id"
+
+        for trace in self.traces:
+            sql_query = 'SELECT cycle_start,length FROM inst'
+            if int(cu_id) != -1:
+                sql_query += ' WHERE cu=' + cu_id
+            sql_query += ' ORDER by line'
+            df = pd.read_sql_query(sql_query, trace._database)
+
+            if int(cu_id) != -1:
+                condition = 'WHERE cu=' + cu_id
+                cycle_count = trace.getMax(
+                    "inst", "cycle_start + length", condition)
+                trace_title = trace._file_name + ": " + str(cycle_count)
+            else:
+                trace_title = trace._file_name
+
+            plot = figure(webgl=True,
+                          plot_width=self.plot_width,
+                          plot_height=self.plot_height,
+                          x_range=all_in_one.x_range,
+                          y_range=all_in_one.y_range,
+                          title=trace_title)
+            # plot.add_tools(HoverTool())
+            plot.xaxis.axis_label = "cycle"
+            plot.yaxis.axis_label = "inst_id"
+
+            y_axis = range(len(df.index))
+
+            plot.segment(x0=df["cycle_start"],
+                         y0=y_axis,
+                         x1=df["cycle_start"] + df["length"],
+                         y1=y_axis,
+                         line_width=1,
+                         legend=trace._file_name,
+                         color=trace._color)
+            # plot.circle(df["cycle_start"],
+            #             y_axis,
+            #             legend=trace._file_name,
+            #             color=trace._color,
+            #             size=5)
+            plot.legend.location = "top_left"
+
+            all_in_one.segment(x0=df["cycle_start"],
+                               y0=y_axis,
+                               x1=df["cycle_start"] + df["length"],
+                               y1=y_axis,
+                               line_width=1,
+                               legend=trace._file_name,
+                               color=trace._color)
+            # all_in_one.circle(df["cycle_start"],
+            #                   y_axis,
+            #                   legend=trace._file_name,
+            #                   color=trace._color,
+            #                   size=5)
+            all_in_one.legend.location = "top_left"
 
             figures.append(plot)
 
@@ -525,7 +673,7 @@ def main():
     parser = argparse.ArgumentParser(
         description='Multi2Sim simulation trace analyzer')
     parser.add_argument('traceFiles', nargs='+',
-                        help='Uncompressed Multi2Sim trace file')
+                        help='Multi2Sim trace files')
     parser.add_argument("-t", "--table", nargs=1,
                         default="cycle",
                         help='Choose table name')
@@ -535,12 +683,18 @@ def main():
     parser.add_argument("-y", "--yaxis", nargs=1,
                         default="stall",
                         help='Choose y axis statistic name')
+    parser.add_argument("-cu", "--cuid", nargs=1,
+                        default=-1,
+                        help='Filter on cumpute unit')
     parser.add_argument("-s", "--stat",
                         action="store_true",
                         help='Show statistics')
     parser.add_argument("-v", "--visual",
                         action="store_true",
                         help='Visualize statistics')
+    parser.add_argument("-p", "--pipeline",
+                        action="store_true",
+                        help='Show pipeline')
     args = parser.parse_args()
 
     # Traces
@@ -552,6 +706,9 @@ def main():
 
     if args.visual:
         traces.plot(args.table[0], args.xaxis[0], args.yaxis[0])
+
+    if args.pipeline:
+        traces.plotPipeline(args.cuid[0])
 
 if __name__ == '__main__':
     main()
