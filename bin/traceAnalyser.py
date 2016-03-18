@@ -8,9 +8,16 @@ import sqlite3
 import time
 
 import pandas as pd
-from bokeh.models import HoverTool
+from bokeh.charts import Histogram, Bar
 from bokeh.plotting import figure, show, output_file
-from bokeh.io import vplot
+from bokeh.io import vplot, gridplot
+from bokeh.charts import defaults
+
+
+screen_width = 1560
+
+defaults.width = int(screen_width * 0.3)
+defaults.height = defaults.width
 
 
 class pp():
@@ -440,7 +447,7 @@ class Trace:
         sql_query += conditions
         col_sum = c.execute(sql_query).fetchone()[0]
 
-        return column_name + '\t\t\t' + str(col_sum)
+        return int(col_sum)
 
     def getCount(self, table_name, column_name, conditions=''):
         if self._database is None:
@@ -460,15 +467,32 @@ class Trace:
                 " to " + str(self._cycle_end)
         else:
             print "Cycle 0 to " + str(self.getMax("cycle", "cycle"))
-        print self.getSum('cycle', 'stall')
-        print self.getSum('cycle', 'fetch')
-        print self.getSum('cycle', 'issue')
-        print self.getSum('cycle', 'branch')
-        print self.getSum('cycle', 'mem_new')
-        print self.getSum('cycle', 'mem')
-        print self.getSum('cycle', 'lds')
-        print self.getSum('cycle', 'scalar')
-        print self.getSum('cycle', 'simd')
+        print 'stall' + '\t\t\t' + str(self.getSum('cycle', 'stall'))
+        print 'fetch' + '\t\t\t' + str(self.getSum('cycle', 'fetch'))
+        print 'issue' + '\t\t\t' + str(self.getSum('cycle', 'issue'))
+        print 'branch' + '\t\t\t' + str(self.getSum('cycle', 'branch'))
+        print 'mem_new' + '\t\t\t' + str(self.getSum('cycle', 'mem_new'))
+        print 'mem' + '\t\t\t' + str(self.getSum('cycle', 'mem'))
+        print 'lds' + '\t\t\t' + str(self.getSum('cycle', 'lds'))
+        print 'scalar' + '\t\t\t' + str(self.getSum('cycle', 'scalar'))
+        print 'simd' + '\t\t\t' + str(self.getSum('cycle', 'simd'))
+
+    def getAllCountAsList(self):
+        stats = []
+
+        # stats.append(self._file_name)
+        stats.append(self.getMax("cycle", "cycle"))
+        stats.append(self.getSum('cycle', 'stall'))
+        stats.append(self.getSum('cycle', 'fetch'))
+        stats.append(self.getSum('cycle', 'issue'))
+        stats.append(self.getSum('cycle', 'branch'))
+        stats.append(self.getSum('cycle', 'mem_new'))
+        stats.append(self.getSum('cycle', 'mem'))
+        stats.append(self.getSum('cycle', 'lds'))
+        stats.append(self.getSum('cycle', 'scalar'))
+        stats.append(self.getSum('cycle', 'simd'))
+
+        return stats
 
 
 class Traces():
@@ -477,8 +501,8 @@ class Traces():
 
         self.trace_files = trace_files
         self.traces = []
-        self.plot_width = 1560
-        self.plot_height = 400
+        self.plot_height = defaults.height
+        self.plot_width = screen_width - self.plot_height
 
         for trace in trace_files:
             t = Trace(trace)
@@ -491,7 +515,11 @@ class Traces():
     def plot(self, table_name, x_column_name, y_column_name):
 
         # Output to static HTML file
-        output_file(y_column_name + x_column_name + '.html')
+        prefix = self.trace_files[0].split('_')
+        output_file_name = prefix[0] + "_"
+        output_file_name += y_column_name + "_" + x_column_name
+        output_file_name += "_" + prefix[4]
+        output_file(output_file_name + '.html', title=output_file_name)
 
         # List of figures
         figures = []
@@ -515,11 +543,31 @@ class Traces():
         all_in_one.xaxis.axis_label = x_column_name
         all_in_one.yaxis.axis_label = y_column_name
 
+        # Statistics table
+        stats = {}
+        stats['data'] = []
+        stats['name'] = []
+        stats['catagory'] = []
+        catagory = ['cycle', 'stall', 'fetch', 'issue',
+                    'branch', 'mem_new', 'mem', 'lds',
+                    'scalar', 'simd']
+        stats_colors = []
+
+        count = 0
         for trace in self.traces:
+            # Build stats table
+            stats['data'].extend(trace.getAllCountAsList())
+            stats['name'].extend([count] * 10)
+            stats['catagory'].extend(catagory)
+            stats_colors.append(str(trace._color))
+            count += 1
+
+            # Get the data from database
             sql_query = 'SELECT ' + x_column_name + ',' + y_column_name + \
                 ' FROM ' + table_name
             df = pd.read_sql_query(sql_query, trace._database)
 
+            # Plot the main view
             plot_title = trace._file_name + " : " + \
                 str(trace.getMax("cycle", "cycle")) + " cycles"
             plot = figure(webgl=True,
@@ -538,6 +586,13 @@ class Traces():
                          line_width=1,
                          legend=trace._file_name,
                          color=trace._color)
+
+            # Plot histogram on the right
+            plot_hist = Histogram(df[y_column_name],
+                                  y_column_name,
+                                  bins=max(int(y_max / 10), 50),
+                                  color=trace._color,
+                                  title='Distribution of ' + y_column_name)
 
             all_in_one.segment(x0=df[x_column_name],
                                y0=df[y_column_name],
@@ -559,21 +614,36 @@ class Traces():
             #                   color=trace._color,
             #                   size=5)
 
-            figures.append(plot)
+            figures.append([plot, plot_hist])
 
-        figures.append(all_in_one)
+        # Plot statistics
+        # print stats
+        stats_compare = Bar(stats,
+                            values='data',
+                            group='name',
+                            label='catagory',
+                            color=stats_colors,
+                            legend='top_left',
+                            ylabel='Count',
+                            title='Normalized statistics')
+
+        figures.append([all_in_one, stats_compare])
 
         # Plot all figures
-        p = vplot(*figures)
+        p = gridplot(figures)
         show(p)
 
     def plotPipeline(self, cu_id):
 
         # Output to static HTML file
+        prefix = self.trace_files[0].split('_')
+        output_file_name = prefix[0] + "_pipeline"
         if int(cu_id) != -1:
-            output_file('pipeline_cu' + cu_id + '.html')
+            output_file_name += '_cu_' + str(cu_id) + "_"
         else:
-            output_file('pipeline_all_cu.html')
+            output_file_name += '_all_cu_'
+        output_file_name += prefix[4]
+        output_file(output_file_name + '.html', title=output_file_name)
 
         # List of figures
         figures = []
@@ -625,7 +695,6 @@ class Traces():
                           x_range=all_in_one.x_range,
                           y_range=all_in_one.y_range,
                           title=trace_title)
-            # plot.add_tools(HoverTool())
             plot.xaxis.axis_label = "cycle"
             plot.yaxis.axis_label = "inst_id"
 
@@ -638,11 +707,6 @@ class Traces():
                          line_width=1,
                          legend=trace._file_name,
                          color=trace._color)
-            # plot.circle(df["cycle_start"],
-            #             y_axis,
-            #             legend=trace._file_name,
-            #             color=trace._color,
-            #             size=5)
             plot.legend.location = "top_left"
 
             all_in_one.segment(x0=df["cycle_start"],
@@ -652,11 +716,6 @@ class Traces():
                                line_width=1,
                                legend=trace._file_name,
                                color=trace._color)
-            # all_in_one.circle(df["cycle_start"],
-            #                   y_axis,
-            #                   legend=trace._file_name,
-            #                   color=trace._color,
-            #                   size=5)
             all_in_one.legend.location = "top_left"
 
             figures.append(plot)
