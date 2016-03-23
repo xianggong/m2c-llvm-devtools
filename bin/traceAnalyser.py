@@ -1,14 +1,17 @@
 #!/usr/bin/python
+""" Trace analyzer for Multi2Sim """
 
 import argparse
-import tracedatabase as td
-import tracemisc as tm
-
 import pandas as pd
+import numpy as np
 from bokeh.charts import Histogram, Bar
 from bokeh.plotting import figure, show, output_file
 from bokeh.io import vplot, gridplot
 from bokeh.charts import defaults
+from bokeh.palettes import Spectral5
+
+import tracedatabase as td
+import tracemisc as tm
 
 SCREEN_WIDTH = 1560
 
@@ -16,28 +19,39 @@ defaults.width = int(SCREEN_WIDTH * 0.3)
 defaults.height = defaults.width
 
 
-class Trace:
+class Trace(object):
+    """ Trace of Multi2Sim """
 
     def __init__(self, file_name):
+
         # Trace information
-        self._file_name = file_name
-        self._trace = open(file_name, "r")
+        self.__file_name = file_name
+        self.__color = tm.get_random_color()
 
-        # Try to load database if there is one
-        self._database = td.load_database(self._file_name)
-
-        self._color = tm.get_random_color()
+        # Load database
+        self.__database = td.load_database(self.__file_name)
 
     def __build_database(self):
-        self._database = td.load_database(self._file_name)
+        self.__database = td.load_database(self.__file_name)
 
-    # Statistics getters
+    def get_file_name(self):
+        """ Get file name """
+        return self.__file_name
+
+    def get_color(self):
+        """ Get color assigned to trace """
+        return self.__color
+
+    def get_db(self):
+        """ Get database """
+        return self.__database
+
     def get_column(self, table_name, column_name):
         """ Get a column from database """
-        if self._database is None:
+        if self.__database is None:
             self.__build_database()
 
-        cursor = self._database.cursor()
+        cursor = self.__database.cursor()
         sql_query = 'SELECT ' + column_name + ' FROM ' + table_name
 
         return cursor.execute(sql_query)
@@ -46,10 +60,10 @@ class Trace:
                             table_name, column_name,
                             func_name, conditions=''):
         """ Get a column from database, apply with function """
-        if self._database is None:
+        if self.__database is None:
             self.__build_database()
 
-        cursor = self._database.cursor()
+        cursor = self.__database.cursor()
         sql_query = 'SELECT ' + func_name
         sql_query += '(' + column_name + ') FROM ' + table_name + ' '
         sql_query += conditions
@@ -70,39 +84,45 @@ class Trace:
         return int(self.get_column_function(table_name, column_name,
                                             'COUNT', conditions))
 
+    def print_table_columns_with_func(self, table_name, func_name):
+        cursor = self.__database.cursor()
+        cursor.execute('SELECT * from ' + table_name)
+
+        field_names = [i[0] for i in cursor.description]
+        print 'Table: ' + table_name
+        for column in field_names:
+            output = '\t' + column.ljust(16)
+            output += str(self.get_column_function(table_name,
+                                                   column, func_name))
+            print output
+
     def get_all_count(self):
         """ Get all the count """
         print "Cycle 0 to " + str(self.get_max("cycle", "cycle"))
-        print 'stall' + '\t\t\t' + str(self.get_sum('cycle', 'stall'))
-        print 'fetch' + '\t\t\t' + str(self.get_sum('cycle', 'fetch'))
-        print 'issue' + '\t\t\t' + str(self.get_sum('cycle', 'issue'))
-        print 'branch' + '\t\t\t' + str(self.get_sum('cycle', 'branch'))
-        print 'mem_new' + '\t\t\t' + str(self.get_sum('cycle', 'mem_new'))
-        print 'mem' + '\t\t\t' + str(self.get_sum('cycle', 'mem'))
-        print 'lds' + '\t\t\t' + str(self.get_sum('cycle', 'lds'))
-        print 'scalar' + '\t\t\t' + str(self.get_sum('cycle', 'scalar'))
-        print 'simd' + '\t\t\t' + str(self.get_sum('cycle', 'simd'))
+        self.print_table_columns_with_func('cycle', 'SUM')
 
     def get_all_count_as_list(self):
         """ Get all the count as list """
         stats = []
 
-        # stats.append(self._file_name)
         stats.append(self.get_max("cycle", "cycle"))
         stats.append(self.get_sum('cycle', 'stall'))
         stats.append(self.get_sum('cycle', 'fetch'))
         stats.append(self.get_sum('cycle', 'issue'))
         stats.append(self.get_sum('cycle', 'branch'))
-        stats.append(self.get_sum('cycle', 'mem_new'))
         stats.append(self.get_sum('cycle', 'mem'))
         stats.append(self.get_sum('cycle', 'lds'))
         stats.append(self.get_sum('cycle', 'scalar'))
         stats.append(self.get_sum('cycle', 'simd'))
+        stats.append(self.get_sum('cycle', 'mem_new_all'))
+        stats.append(self.get_sum('cycle', 'mem_new_lds'))
+        stats.append(self.get_sum('cycle', 'mem_new_mm'))
 
         return stats
 
 
-class Traces():
+class Traces(object):
+    """ Traces """
 
     def __init__(self, trace_files):
 
@@ -111,15 +131,17 @@ class Traces():
         self.plot_height = defaults.height
         self.plot_width = SCREEN_WIDTH - self.plot_height
 
-        for trace in trace_files:
-            t = Trace(trace)
-            self.traces.append(t)
+        for trace_file in trace_files:
+            trace = Trace(trace_file)
+            self.traces.append(trace)
 
     def stat(self):
+        """ Show all statistics """
         for trace in self.traces:
             trace.get_all_count()
 
     def plot(self, table_name, x_column_name, y_column_name):
+        """ Plot traces """
 
         # Output to static HTML file
         prefix = self.trace_files[0].split('_')
@@ -160,29 +182,31 @@ class Traces():
                     'fetch',
                     'issue',
                     'branch',
-                    'mem_new',
                     'mem',
                     'lds',
                     'scalar',
-                    'simd']
+                    'simd',
+                    'mem_new_all',
+                    'mem_new_lds',
+                    'mem_new_mm']
         stats_colors = []
 
         count = 0
         for trace in self.traces:
             # Build stats table
             stats['data'].extend(trace.get_all_count_as_list())
-            stats['name'].extend([count] * 10)
+            stats['name'].extend([count] * 12)
             stats['catagory'].extend(catagory)
-            stats_colors.append(str(trace._color))
+            stats_colors.append(str(trace.get_color()))
             count += 1
 
             # Get the data from database
             sql_query = 'SELECT ' + x_column_name + ',' + y_column_name + \
                 ' FROM ' + table_name
-            df = pd.read_sql_query(sql_query, trace._database)
+            df = pd.read_sql_query(sql_query, trace.get_db())
 
             # Plot the main view
-            plot_title = trace._file_name + " : " + \
+            plot_title = trace.get_file_name() + " : " + \
                 str(trace.get_max("cycle", "cycle")) + " cycles"
             plot = figure(webgl=True,
                           plot_width=self.plot_width,
@@ -198,14 +222,14 @@ class Traces():
                          x1=df[x_column_name],
                          y1=0,
                          line_width=1,
-                         legend=trace._file_name,
-                         color=trace._color)
+                         legend=trace.get_file_name(),
+                         color=trace.get_color())
 
-            # Plot histogram on the right
-            plot_hist = Histogram(df[y_column_name],
+            # Plot histogram on the right, ignore zeroes
+            plot_hist = Histogram(df[y_column_name].replace(0, np.nan),
                                   y_column_name,
                                   bins=max(int(y_max / 10), 50),
-                                  color=trace._color,
+                                  color=trace.get_color(),
                                   title='Distribution of ' + y_column_name)
 
             all_in_one.segment(x0=df[x_column_name],
@@ -213,8 +237,8 @@ class Traces():
                                x1=df[x_column_name],
                                y1=0,
                                line_width=1,
-                               legend=trace._file_name,
-                               color=trace._color)
+                               legend=trace.get_file_name(),
+                               color=trace.get_color())
 
             figures.append([plot, plot_hist])
 
@@ -226,13 +250,13 @@ class Traces():
                             color=stats_colors,
                             legend='top_left',
                             ylabel='Count',
-                            title='Normalized statistics')
+                            title='Statistics')
 
         figures.append([all_in_one, stats_compare])
 
         # Plot all figures
-        p = gridplot(figures)
-        show(p)
+        plots = gridplot(figures)
+        show(plots)
 
     def plotPipeline(self, cu_id):
 
@@ -280,15 +304,15 @@ class Traces():
             if int(cu_id) != -1:
                 sql_query += ' WHERE cu=' + cu_id
             sql_query += ' ORDER by line'
-            df = pd.read_sql_query(sql_query, trace._database)
+            df = pd.read_sql_query(sql_query, trace.get_db())
 
             if int(cu_id) != -1:
                 condition = 'WHERE cu=' + cu_id
                 cycle_count = trace.get_max(
                     "inst", "cycle_start + length", condition)
-                trace_title = trace._file_name + ": " + str(cycle_count)
+                trace_title = trace.get_file_name() + ": " + str(cycle_count)
             else:
-                trace_title = trace._file_name
+                trace_title = trace.get_file_name()
 
             plot = figure(webgl=True,
                           plot_width=self.plot_width,
@@ -306,7 +330,7 @@ class Traces():
                          x1=df["cycle_start"] + df["length"],
                          y1=y_axis,
                          line_width=1,
-                         legend=trace._file_name,
+                         legend=trace.get_file_name(),
                          color=trace._color)
             plot.legend.location = "top_left"
 
@@ -315,7 +339,7 @@ class Traces():
                                x1=df["cycle_start"] + df["length"],
                                y1=y_axis,
                                line_width=1,
-                               legend=trace._file_name,
+                               legend=trace.get_file_name(),
                                color=trace._color)
             all_in_one.legend.location = "top_left"
 
@@ -327,7 +351,7 @@ class Traces():
         p = vplot(*figures)
         show(p)
 
-    def plotMemory(self, mode='pipeline'):
+    def plotMemory(self, mode='pipe'):
         # Output to static HTML file
         prefix = self.trace_files[0].split('_')
         output_file_name = prefix[0] + "_memory_" + mode + "_"
@@ -341,11 +365,11 @@ class Traces():
         x_max = 1
         y_max = 1
         for trace in self.traces:
-            if mode == 'pipeline':
+            if mode == 'pipe':
                 x_max = max(trace.get_max(
                     "memory", "cycle_start + length"), x_max)
                 y_max = max(trace.get_count("memory", "mem_access_id"), y_max)
-            elif mode == 'statistic':
+            elif mode == 'stat':
                 x_max = max(trace.get_count("memory", "mem_access_id"), x_max)
                 y_max = max(trace.get_max("memory", "length"), y_max)
         x_max *= 1.01
@@ -368,9 +392,9 @@ class Traces():
                          'access_type="store" and access_location="LDS[0]"'
                          ]
 
-        accees_legend = ['Global Memory: NC Store',
-                         'Global Memory: Load ',
-                         'Global Memory, Store ',
+        accees_legend = ['M M: NC Store',
+                         'M M: Load ',
+                         'M M, Store ',
                          'LDS: Load',
                          'LDS: Store',
                          ]
@@ -381,17 +405,19 @@ class Traces():
                           plot_height=self.plot_height,
                           x_range=all_in_one.x_range,
                           y_range=all_in_one.y_range,
-                          title=trace._file_name)
+                          title=trace.get_file_name())
+
+            figure_row_list = [plot]
 
             for index in range(len(access_filter)):
                 sql_query = 'SELECT cycle_start,length,mem_access_id \
                             FROM memory'
                 sql_query += ' WHERE ' + access_filter[index]
                 sql_query += ' ORDER by line'
-                df = pd.read_sql_query(sql_query, trace._database)
+                df = pd.read_sql_query(sql_query, trace.get_db())
 
                 color = tm.get_random_color()
-                if mode == 'statistic':
+                if mode == 'stat':
                     plot.xaxis.axis_label = "mem access id"
                     plot.yaxis.axis_label = "cycle"
                     plot.segment(x0=df["mem_access_id"],
@@ -402,22 +428,15 @@ class Traces():
                                  legend=accees_legend[index],
                                  color=color)
 
-                    # Plot histogram on the right
-                    # print df["length"]
-                    plot_hist = Histogram(df["length"],
-                                          bins=max(int(y_max / 10), 50),
-                                          color=color,
-                                          title='Distribution of length')
-
                     all_in_one.segment(x0=df["mem_access_id"],
                                        y0=0,
                                        x1=df["mem_access_id"],
                                        y1=df["length"],
                                        line_width=1,
-                                       legend=trace._file_name,
+                                       legend=trace.get_file_name(),
                                        color=color)
                     # all_in_one.legend.location = "top_left"
-                elif mode == 'pipeline':
+                elif mode == 'pipe':
                     plot.xaxis.axis_label = "cycle"
                     plot.yaxis.axis_label = "mem access id"
                     plot.segment(x0=df["cycle_start"],
@@ -428,24 +447,29 @@ class Traces():
                                  legend=accees_legend[index],
                                  color=color)
 
-                    # Plot histogram on the right
-                    plot_hist = Histogram(df["length"],
-                                          bins=max(int(y_max / 10), 50),
-                                          color=color,
-                                          title='Distribution of length')
-
                     all_in_one.segment(x0=df["cycle_start"],
                                        y0=df["mem_access_id"],
                                        x1=df["cycle_start"] + df["length"],
                                        y1=df["mem_access_id"],
                                        line_width=1,
-                                       legend=trace._file_name,
+                                       legend=trace.get_file_name(),
                                        color=color)
                     # all_in_one.legend.location = "top_left"
 
-            figures.append([plot, plot_hist])
+                # Plot histogram on the right
+                try:
+                    plot_hist = Histogram(df["length"].replace(0, np.nan),
+                                          'length',
+                                          bins=max(int(y_max / 10), 50),
+                                          color=color,
+                                          title=accees_legend[index])
+                    figure_row_list.append(plot_hist)
+                except ValueError:
+                    continue
 
-        figures.append([all_in_one, None])
+            figures.append(figure_row_list)
+
+        figures.append([all_in_one])
 
         # Plot all figures
         p = gridplot(figures)

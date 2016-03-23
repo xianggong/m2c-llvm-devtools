@@ -11,12 +11,14 @@ STAT_STALL = 0
 STAT_FETCH = 1
 STAT_ISSUE = 2
 STAT_BRANCH = 3
-STAT_MEM_NEW = 4
-STAT_MEM = 5
-STAT_LDS = 6
-STAT_SCALAR = 7
-STAT_SIMD = 8
-STAT_COUNT = 9
+STAT_MEM = 4
+STAT_LDS = 5
+STAT_SCALAR = 6
+STAT_SIMD = 7
+STAT_MEM_NEW_ALL = 8
+STAT_MEM_NEW_LDS = 9
+STAT_MEM_NEW_MM = 10
+STAT_COUNT = 11
 
 INST_START = 0
 INST_LENGTH = 1
@@ -215,7 +217,12 @@ class DatabaseBuilder(object):
         """ Parse memory info """
         if 'mem.' in line:
             if 'mem.new_access ' in line:
-                self.__inc_count(STAT_MEM_NEW, cycle)
+                self.__inc_count(STAT_MEM_NEW_ALL, cycle)
+                if 'LDS' in line:
+                    self.__inc_count(STAT_MEM_NEW_LDS, cycle)
+                else:
+                    self.__inc_count(STAT_MEM_NEW_MM, cycle)
+
                 mem_access_name = tp.get_name(line)
                 mem_access_addr = tp.get_name(line)
                 mem_access_type = tp.get_type(line)
@@ -270,9 +277,10 @@ class DatabaseBuilder(object):
         cursor.execute('''CREATE TABLE IF NOT EXISTS cycle
             (cycle INTEGER, stall INTEGER,
              fetch INTEGER, issue INTEGER,
-             branch INTEGER, mem_new INTEGER,
-             mem INTEGER, lds INTEGER,
-             scalar INTEGER, simd INTEGER)''')
+             branch INTEGER, mem INTEGER,
+             lds INTEGER, scalar INTEGER,
+             simd INTEGER, mem_new_all INTEGER,
+             mem_new_lds INTEGER, mem_new_mm INTEGER)''')
 
         # Add stat view data
         for key in self.__stat_view[STAT_STALL].keys():
@@ -281,19 +289,21 @@ class DatabaseBuilder(object):
             fetch = self.__stat_view[STAT_FETCH][key]
             issue = self.__stat_view[STAT_ISSUE][key]
             branch = self.__stat_view[STAT_BRANCH][key]
-            mem_new = self.__stat_view[STAT_MEM_NEW][key]
             mem = self.__stat_view[STAT_MEM][key]
             lds = self.__stat_view[STAT_LDS][key]
             scalar = self.__stat_view[STAT_SCALAR][key]
             simd = self.__stat_view[STAT_SIMD][key]
+            mem_new_all = self.__stat_view[STAT_MEM_NEW_ALL][key]
+            mem_new_lds = self.__stat_view[STAT_MEM_NEW_LDS][key]
+            mem_new_mm = self.__stat_view[STAT_MEM_NEW_MM][key]
 
             cursor.execute('INSERT INTO cycle VALUES\
                            (?, ?, ?, ?, \
                             ?, ?, ?, ?, \
-                            ?, ?)',
+                            ?, ?, ?, ?)',
                            (cycle, stall, fetch, issue,
-                            branch, mem_new, mem, lds,
-                            scalar, simd))
+                            branch, mem, lds, scalar,
+                            simd, mem_new_all, mem_new_lds, mem_new_mm))
 
         # Save (commit) the changes
         database.commit()
