@@ -2,13 +2,13 @@
 """ Trace analyzer for Multi2Sim """
 
 import argparse
+import collections
 import pandas as pd
 import numpy as np
 from bokeh.charts import Histogram, Bar
 from bokeh.plotting import figure, show, output_file
 from bokeh.io import vplot, gridplot
 from bokeh.charts import defaults
-from bokeh.palettes import Spectral5
 
 import tracedatabase as td
 import tracemisc as tm
@@ -85,6 +85,7 @@ class Trace(object):
                                             'COUNT', conditions))
 
     def print_table_columns_with_func(self, table_name, func_name):
+        """ Print table columns information """
         cursor = self.__database.cursor()
         cursor.execute('SELECT * from ' + table_name)
 
@@ -119,6 +120,88 @@ class Trace(object):
         stats.append(self.get_sum('cycle', 'mem_new_mm'))
 
         return stats
+
+    def __get_memory_access_detailed(self):
+        """ Plot memory histogram in a row """
+        sql_query = 'SELECT DISTINCT access_location, access_type FROM memory '
+        sql_query += 'ORDER by  access_location, access_type'
+        dataframe = pd.read_sql_query(sql_query, self.get_db())
+        return dataframe
+
+    def __get_memory_access_types(self, mode='overview'):
+        access = collections.OrderedDict()
+
+        if mode == 'overview':
+            access['M M: Load'] = 'access_type="load" \
+                                   and access_location!="LDS[0]"'
+            access['M M: Store'] = 'access_type="store" \
+                                    and access_location!="LDS[0]"'
+            access['M M: NC Store'] = 'access_type="nc_store"'
+            access['LDS: Load'] = 'access_type="load" \
+                                   and access_location="LDS[0]"'
+            access['LDS: Store'] = 'access_type="store" \
+                                   and access_location="LDS[0]"'
+        elif mode == 'detailed':
+            access_combinations = self.__get_memory_access_detailed()
+            for index, row in access_combinations.iterrows():
+                loc = row['access_location']
+                aty = row['access_type']
+                sql_query = 'access_location="' + loc
+                sql_query += '" and access_type="' + aty + '"'
+                access[loc + " " + aty] = sql_query
+
+        return access
+
+    def get_memory_hist_plot_list(self, mode='overview'):
+        """ Plot memory histogram in a row """
+        access = self.__get_memory_access_types(mode)
+
+        info = {}
+        row_plot = []
+        row_name = []
+        row_color = []
+        row_mean = []
+        row_median = []
+        index_list = []
+
+        for key, value in access.iteritems():
+            sql_query = 'SELECT length FROM memory'
+            sql_query += ' WHERE ' + value
+            sql_query += ' ORDER by line'
+            dataframe = pd.read_sql_query(sql_query, self.get_db())
+
+            color = tm.get_random_color()
+
+            # Plot histogram
+            try:
+                mean = str(np.round_(dataframe["length"].mean(), 2))
+                median = str(dataframe["length"].median())
+                hist_title = key
+                hist_title += ' / avg ' + mean
+                hist_title += ' / mid ' + median
+                plot_hist = Histogram(dataframe["length"].replace(0, np.nan),
+                                      'length',
+                                      bins=50,
+                                      color=color,
+                                      title=hist_title)
+            except ValueError:
+                continue
+
+            row_plot.append(plot_hist)
+            row_name.append(key)
+            row_color.append(color)
+            row_mean.append(mean)
+            row_median.append(median)
+            index_list.append(self.get_file_name())
+
+        info['plot'] = row_plot
+        info['name'] = row_name
+        info['color'] = row_color
+        info['mean'] = row_mean
+        info['median'] = row_median
+
+        dataframe = pd.DataFrame(info, index=index_list)
+        return dataframe
 
 
 class Traces(object):
@@ -351,7 +434,24 @@ class Traces(object):
         p = vplot(*figures)
         show(p)
 
-    def plotMemory(self, mode='pipe'):
+    def plot_memory_hist(self, mode='overview'):
+        # Output to static HTML file
+        prefix = self.trace_files[0].split('_')
+        output_file_name = prefix[0] + "_memory_hist_" + mode + "_"
+        output_file_name += prefix[4]
+        output_file(output_file_name + '.html', title=output_file_name)
+
+        # List of figures
+        figures = []
+        for trace in self.traces:
+            info_df = trace.get_memory_hist_plot_list(mode)
+            figures.append(info_df['plot'].tolist())
+
+        # Plot all figures
+        plot = gridplot(figures)
+        show(plot)
+
+    def plotMemory(self, mode='stat'):
         # Output to static HTML file
         prefix = self.trace_files[0].split('_')
         output_file_name = prefix[0] + "_memory_" + mode + "_"
@@ -377,7 +477,7 @@ class Traces(object):
 
         # Plotting
         all_in_one = figure(webgl=True,
-                            plot_width=self.plot_width,
+                            plot_width=SCREEN_WIDTH,
                             plot_height=self.plot_height,
                             x_range=(0, x_max),
                             y_range=(0, y_max),
@@ -393,21 +493,22 @@ class Traces(object):
                          ]
 
         accees_legend = ['M M: NC Store',
-                         'M M: Load ',
-                         'M M, Store ',
+                         'M M: Load',
+                         'M M, Store',
                          'LDS: Load',
                          'LDS: Store',
                          ]
 
         for trace in self.traces:
-            plot = figure(webgl=True,
-                          plot_width=self.plot_width,
-                          plot_height=self.plot_height,
-                          x_range=all_in_one.x_range,
-                          y_range=all_in_one.y_range,
-                          title=trace.get_file_name())
-
-            figure_row_list = [plot]
+            figure_row_list = []
+            if mode != 'hist':
+                plot = figure(webgl=True,
+                              plot_width=SCREEN_WIDTH,
+                              plot_height=self.plot_height,
+                              x_range=all_in_one.x_range,
+                              y_range=all_in_one.y_range,
+                              title=trace.get_file_name())
+                figure_row_list = [plot]
 
             for index in range(len(access_filter)):
                 sql_query = 'SELECT cycle_start,length,mem_access_id \
@@ -435,7 +536,8 @@ class Traces(object):
                                        line_width=1,
                                        legend=trace.get_file_name(),
                                        color=color)
-                    # all_in_one.legend.location = "top_left"
+                    all_in_one.legend.location = "top_left"
+
                 elif mode == 'pipe':
                     plot.xaxis.axis_label = "cycle"
                     plot.yaxis.axis_label = "mem access id"
@@ -454,18 +556,7 @@ class Traces(object):
                                        line_width=1,
                                        legend=trace.get_file_name(),
                                        color=color)
-                    # all_in_one.legend.location = "top_left"
-
-                # Plot histogram on the right
-                try:
-                    plot_hist = Histogram(df["length"].replace(0, np.nan),
-                                          'length',
-                                          bins=max(int(y_max / 10), 50),
-                                          color=color,
-                                          title=accees_legend[index])
-                    figure_row_list.append(plot_hist)
-                except ValueError:
-                    continue
+                    all_in_one.legend.location = "top_left"
 
             figures.append(figure_row_list)
 
@@ -505,7 +596,10 @@ def main():
                         help='Visualize pipeline')
     parser.add_argument("-m", "--memory",
                         choices=['pipe', 'stat'],
-                        help='Visualize memory pipeline')
+                        help='Visualize memory')
+    parser.add_argument("-mh", "--memoryhist",
+                        choices=['overview', 'detailed'],
+                        help='Visualize memory access in histogram')
     args = parser.parse_args()
 
     # Traces
@@ -523,6 +617,9 @@ def main():
 
     if args.memory:
         traces.plotMemory(args.memory)
+
+    if args.memoryhist:
+        traces.plot_memory_hist(args.memoryhist)
 
 if __name__ == '__main__':
     main()
