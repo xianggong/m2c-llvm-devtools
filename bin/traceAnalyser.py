@@ -72,9 +72,9 @@ class Trace(object):
 
         return cursor.execute(sql_query)
 
-    def get_column_function(self,
-                            table_name, column_name,
-                            func_name, conditions=''):
+    def get_column_with_func_cond(self,
+                                  table_name, column_name,
+                                  func_name, conditions=''):
         """ Get a column from database, apply with function """
         if self.__database is None:
             self.__build_database()
@@ -87,18 +87,18 @@ class Trace(object):
 
     def get_max(self, table_name, column_name, conditions=''):
         """ Get the maximum of a column from database """
-        return int(self.get_column_function(table_name, column_name,
-                                            'MAX', conditions))
+        return int(self.get_column_with_func_cond(table_name, column_name,
+                                                  'MAX', conditions))
 
     def get_sum(self, table_name, column_name, conditions=''):
         """ Get the sum of a column from database """
-        return int(self.get_column_function(table_name, column_name,
-                                            'SUM', conditions))
+        return int(self.get_column_with_func_cond(table_name, column_name,
+                                                  'SUM', conditions))
 
     def get_count(self, table_name, column_name, conditions=''):
         """ Get the count of a column from database """
-        return int(self.get_column_function(table_name, column_name,
-                                            'COUNT', conditions))
+        return int(self.get_column_with_func_cond(table_name, column_name,
+                                                  'COUNT', conditions))
 
     def print_table_columns_with_func(self, table_name, func_name):
         """ Print table columns information """
@@ -109,8 +109,9 @@ class Trace(object):
         print 'Table: ' + table_name
         for column in field_names:
             output = '\t' + column.ljust(16)
-            output += str(self.get_column_function(table_name,
-                                                   column, func_name))
+            output += str(self.get_column_with_func_cond(table_name,
+                                                         column,
+                                                         func_name))
             print output
 
     def get_all_count(self):
@@ -118,24 +119,56 @@ class Trace(object):
         print "Cycle 0 to " + str(self.get_max("cycle", "cycle"))
         self.print_table_columns_with_func('cycle', 'SUM')
 
-    def get_all_count_as_list(self):
-        """ Get all the count as list """
-        stats = []
+    def __get_valid_column_action(self, table_name):
+        """ Get columes with meaningful statistic and the function to apply """
+        stats = {}
 
-        stats.append(self.get_max("cycle", "cycle"))
-        stats.append(self.get_sum('cycle', 'stall'))
-        stats.append(self.get_sum('cycle', 'fetch'))
-        stats.append(self.get_sum('cycle', 'issue'))
-        stats.append(self.get_sum('cycle', 'branch'))
-        stats.append(self.get_sum('cycle', 'mem'))
-        stats.append(self.get_sum('cycle', 'lds'))
-        stats.append(self.get_sum('cycle', 'scalar'))
-        stats.append(self.get_sum('cycle', 'simd'))
-        stats.append(self.get_sum('cycle', 'mem_new_all'))
-        stats.append(self.get_sum('cycle', 'mem_new_lds'))
-        stats.append(self.get_sum('cycle', 'mem_new_mm'))
+        if table_name == 'cycle':
+            stats['cycle'] = 'MAX'
+            stats['stall'] = 'SUM'
+            stats['fetch'] = 'SUM'
+            stats['issue'] = 'SUM'
+            stats['branch'] = 'SUM'
+            stats['mem'] = 'SUM'
+            stats['lds'] = 'SUM'
+            stats['scalar'] = 'SUM'
+            stats['simd'] = 'SUM'
+            stats['mem_new_all'] = 'SUM'
+            stats['mem_new_lds'] = 'SUM'
+            stats['mem_new_mm'] = 'SUM'
+        elif table_name == 'inst':
+            stats['stall'] = 'SUM'
+            stats['fetch'] = 'SUM'
+            stats['issue'] = 'SUM'
+            stats['active'] = 'SUM'
+        elif table_name == 'memory':
+            stats['length'] = 'MAX'
 
         return stats
+
+    def get_stat_column_in_table(self, table_name):
+        """ Get statistic of each column in a table, return as a dataframe """
+
+        col_field_cat = []
+        col_field_data = []
+        col_field_color = []
+        col_field_index = []
+
+        actions = self.__get_valid_column_action(table_name)
+        for key, value in actions.iteritems():
+            col_field_cat.append(key)
+            col_field_data.append(
+                self.get_column_with_func_cond(table_name, key, value))
+            col_field_color.append(self.get_color())
+            col_field_index.append(self.get_file_name())
+
+        data_sum = {'catagory': col_field_cat,
+                    'data': col_field_data,
+                    'color': col_field_color,
+                    'trace': col_field_index}
+        data_sum_df = pd.DataFrame(data_sum, index=col_field_index)
+
+        return data_sum_df
 
     def __get_memory_access_detailed(self):
         """ Get all memory access types """
@@ -304,33 +337,10 @@ class Traces(object):
         all_in_one.xaxis.axis_label = x_column_name
         all_in_one.yaxis.axis_label = y_column_name
 
-        # Statistics table
-        stats = {}
-        stats['data'] = []
-        stats['name'] = []
-        stats['catagory'] = []
-        catagory = ['cycle',
-                    'stall',
-                    'fetch',
-                    'issue',
-                    'branch',
-                    'mem',
-                    'lds',
-                    'scalar',
-                    'simd',
-                    'mem_new_all',
-                    'mem_new_lds',
-                    'mem_new_mm']
-        stats_colors = []
+        # Statistic for comparison
+        info_compare_list = []
 
-        count = 0
         for trace in self.traces:
-            # Build stats table
-            stats['data'].extend(trace.get_all_count_as_list())
-            stats['name'].extend([count] * 12)
-            stats['catagory'].extend(catagory)
-            stats_colors.append(str(trace.get_color()))
-            count += 1
 
             # Get the data from database
             sql_query = 'SELECT ' + x_column_name + ',' + y_column_name + \
@@ -358,11 +368,17 @@ class Traces(object):
                          color=trace.get_color())
 
             # Plot histogram on the right, ignore zeroes
-            plot_hist = Histogram(df[y_column_name].replace(0, np.nan),
+            df_filter_zero = df[y_column_name].replace(0, np.nan)
+            mean = np.round_(df_filter_zero.mean(), 2)
+            median = df_filter_zero.median()
+            hist_title = 'Distribution of ' + y_column_name
+            hist_title += ' / avg ' + str(mean)
+            hist_title += ' / mid ' + str(median)
+            plot_hist = Histogram(df_filter_zero,
                                   y_column_name,
                                   bins=max(int(y_max / 10), 50),
                                   color=trace.get_color(),
-                                  title='Distribution of ' + y_column_name)
+                                  title=hist_title)
 
             all_in_one.segment(x0=df[x_column_name],
                                y0=df[y_column_name],
@@ -374,13 +390,17 @@ class Traces(object):
 
             figures.append([plot, plot_hist])
 
-        print stats
-        # Plot statistics
-        stats_compare = Bar(stats,
+            # Add statistic to comparison list
+            info_compare_list.append(
+                trace.get_stat_column_in_table(table_name))
+
+        # Plot statistic comparison on the lower right
+        info_df = pd.concat(info_compare_list)
+        stats_compare = Bar(info_df,
                             values='data',
-                            group='name',
+                            group='trace',
                             label='catagory',
-                            color=stats_colors,
+                            color='color',
                             legend='top_left',
                             ylabel='Count',
                             title='Statistics')
@@ -644,6 +664,10 @@ def main():
         description='Multi2Sim simulation trace analyzer')
     parser.add_argument('traceFiles', nargs='+',
                         help='Multi2Sim trace files')
+
+    parser.add_argument("-v", "--visual",
+                        action="store_true",
+                        help='Visualize statistics')
     parser.add_argument("-t", "--table", nargs=1,
                         default="cycle",
                         help='Choose table name')
@@ -653,15 +677,13 @@ def main():
     parser.add_argument("-y", "--yaxis", nargs=1,
                         default="stall",
                         help='Choose y axis statistic name')
+
     parser.add_argument("-cu", "--cuid", nargs=1,
                         default=-1,
                         help='Filter on cumpute unit')
     parser.add_argument("-s", "--stat",
                         action="store_true",
                         help='Show statistics')
-    parser.add_argument("-v", "--visual",
-                        action="store_true",
-                        help='Visualize statistics')
     parser.add_argument("-p", "--pipeline",
                         action="store_true",
                         help='Visualize pipeline')
