@@ -5,7 +5,7 @@ import argparse
 import collections
 import pandas as pd
 import numpy as np
-from bokeh.charts import Histogram, Bar
+from bokeh.charts import Histogram, Bar, Donut
 from bokeh.plotting import figure, show, output_file
 from bokeh.io import vplot, gridplot
 from bokeh.charts import defaults
@@ -37,6 +37,22 @@ class Trace(object):
     def get_file_name(self):
         """ Get file name """
         return self.__file_name
+
+    def get_name_gpu_config(self):
+        """ Get name of GPU configuration from file name """
+        return self.__file_name.split('_')[0]
+
+    def get_name_kernel(self):
+        """ Get name of kernel from file name """
+        return self.__file_name.split('_')[1]
+
+    def get_name_instruction_scheduler(self):
+        """ Get name of instruction scheduler from file name """
+        return self.__file_name.split('_')[3]
+
+    def get_work_size(self):
+        """ Get workload length from file name """
+        return str(self.__file_name.split('_')[4])
 
     def get_color(self):
         """ Get color assigned to trace """
@@ -122,13 +138,14 @@ class Trace(object):
         return stats
 
     def __get_memory_access_detailed(self):
-        """ Plot memory histogram in a row """
+        """ Get all memory access types """
         sql_query = 'SELECT DISTINCT access_location, access_type FROM memory '
         sql_query += 'ORDER by  access_location, access_type'
         dataframe = pd.read_sql_query(sql_query, self.get_db())
         return dataframe
 
     def __get_memory_access_types(self, mode='overview'):
+        """ Get overview of memory access types """
         access = collections.OrderedDict()
 
         if mode == 'overview':
@@ -152,17 +169,15 @@ class Trace(object):
 
         return access
 
-    def get_memory_hist_plot_list(self, mode='overview'):
+    def get_memory_hists(self, mode='overview'):
         """ Plot memory histogram in a row """
         access = self.__get_memory_access_types(mode)
 
-        info = {}
-        row_plot = []
-        row_name = []
-        row_color = []
-        row_mean = []
-        row_median = []
-        index_list = []
+        hists = []
+        data_dfs = []
+
+        col_cycle = []
+        col_index = []
 
         for key, value in access.iteritems():
             sql_query = 'SELECT length FROM memory'
@@ -172,36 +187,70 @@ class Trace(object):
 
             color = tm.get_random_color()
 
-            # Plot histogram
+            col_sched = []
+            col_location = []
+            col_value = []
+            col_type = []
+            col_color = []
+
             try:
-                mean = str(np.round_(dataframe["length"].mean(), 2))
-                median = str(dataframe["length"].median())
+                # Some statistics
+                mean = np.round_(dataframe["length"].mean(), 2)
+                median = dataframe["length"].median()
+                sum_len = dataframe["length"].sum()
+                col_cycle.append(sum_len)
+                col_index.append(key)
+
+                # Plot histogram
                 hist_title = key
-                hist_title += ' / avg ' + mean
-                hist_title += ' / mid ' + median
+                hist_title += ' / avg ' + str(mean)
+                hist_title += ' / mid ' + str(median)
                 plot_hist = Histogram(dataframe["length"].replace(0, np.nan),
                                       'length',
                                       bins=50,
                                       color=color,
+                                      xlabel='Latency of instruction in cycle',
+                                      ylabel='Count',
                                       title=hist_title)
             except ValueError:
                 continue
 
-            row_plot.append(plot_hist)
-            row_name.append(key)
-            row_color.append(color)
-            row_mean.append(mean)
-            row_median.append(median)
-            index_list.append(self.get_file_name())
+            # Ignore NaN
+            if mean == mean and median == median:
+                # Insert mean
+                col_sched.append(self.get_name_instruction_scheduler())
+                col_location.append(key)
+                col_value.append(mean)
+                col_type.append('Mean')
+                col_color.append(color)
 
-        info['plot'] = row_plot
-        info['name'] = row_name
-        info['color'] = row_color
-        info['mean'] = row_mean
-        info['median'] = row_median
+                # Insert median
+                col_sched.append(self.get_name_instruction_scheduler())
+                col_location.append(key)
+                col_value.append(median)
+                col_type.append('Median')
+                col_color.append(color)
 
-        dataframe = pd.DataFrame(info, index=index_list)
-        return dataframe
+                data = {'sched': col_sched,
+                        'location': col_location,
+                        'value': col_value,
+                        'type': col_type,
+                        'color': col_color}
+                data_df = pd.DataFrame(data, index=col_location)
+                data_dfs.append(data_df)
+
+            hists.append(plot_hist)
+
+        # Plot break down of cycles
+        data = {'cycle': col_cycle}
+        cycle_df = pd.DataFrame(data, index=col_index)
+        pie_cycle = Donut(cycle_df.replace(0, np.nan),
+                          title='Break down: cycles')
+        hists.append(pie_cycle)
+
+        info = {'hist': hists,
+                'info': data_dfs}
+        return info
 
 
 class Traces(object):
@@ -325,6 +374,7 @@ class Traces(object):
 
             figures.append([plot, plot_hist])
 
+        print stats
         # Plot statistics
         stats_compare = Bar(stats,
                             values='data',
@@ -441,15 +491,38 @@ class Traces(object):
         output_file_name += prefix[4]
         output_file(output_file_name + '.html', title=output_file_name)
 
-        # List of figures
+        # List of histogram figures
         figures = []
+        data_df = []
         for trace in self.traces:
-            info_df = trace.get_memory_hist_plot_list(mode)
-            figures.append(info_df['plot'].tolist())
+            mem_info = trace.get_memory_hists(mode)
+            figures.append(mem_info['hist'])
+            data_df.append(mem_info['info'])
+
+        # Plot mean and median comparison bar charts
+        bars = []
+        for access_type_index in range(len(data_df[0])):
+            data_df_list = []
+            for index in range(len(data_df)):
+                data_df_list.append(data_df[index][access_type_index])
+            data_dfs = pd.concat(data_df_list)
+            access_location = data_dfs['location'][0]
+            fig_bar = Bar(data_dfs, values='value', group='sched',
+                          color='color', legend='center', label='type',
+                          title=access_location + ': Mean and Median',
+                          ylabel='Cycles')
+            bars.append(fig_bar)
+        figures.append(bars)
 
         # Plot all figures
         plot = gridplot(figures)
         show(plot)
+
+    def plot_memory_stat(self, mode='overview'):
+        prefix = self.trace_files[0].split('_')
+        output_file_name = prefix[0] + "_memory_stat_" + mode + "_"
+        output_file_name += prefix[4]
+        output_file(output_file_name + '.html', title=output_file_name)
 
     def plotMemory(self, mode='stat'):
         # Output to static HTML file
@@ -489,15 +562,13 @@ class Traces(object):
                          'access_type="load" and access_location!="LDS[0]"',
                          'access_type="store" and access_location!="LDS[0]"',
                          'access_type="load" and access_location="LDS[0]"',
-                         'access_type="store" and access_location="LDS[0]"'
-                         ]
+                         'access_type="store" and access_location="LDS[0]"']
 
         accees_legend = ['M M: NC Store',
                          'M M: Load',
                          'M M, Store',
                          'LDS: Load',
-                         'LDS: Store',
-                         ]
+                         'LDS: Store']
 
         for trace in self.traces:
             figure_row_list = []
