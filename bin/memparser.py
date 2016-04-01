@@ -8,7 +8,7 @@ INDEX = [
     'InstSched',
     'WorkSize',
     'ModuleName',
-    'MOduleId',
+    'ModuleId',
 
     'Sets',
     'Assoc',
