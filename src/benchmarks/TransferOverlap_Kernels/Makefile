@@ -94,7 +94,6 @@ rungettrace:
 	@-mkdir trace
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; scp -r *.rpt xgong@$(MYIP):$(CURDIR)/trace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/TransferOverlap; scp -r *.gz xgong@$(MYIP):$(CURDIR)/trace"
-	@-cd trace && gzip -d *.gz
 
 runanalyse:
 	@-$(TRACEANALYSER) TransferOverlap_Kernels TransferOverlap_Kernels_sched TransferOverlap_Kernels_fusion

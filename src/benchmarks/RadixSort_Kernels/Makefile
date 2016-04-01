@@ -94,7 +94,6 @@ rungettrace:
 	@-mkdir trace
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/RadixSort; scp -r *.rpt xgong@$(MYIP):$(CURDIR)/trace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/RadixSort; scp -r *.gz xgong@$(MYIP):$(CURDIR)/trace"
-	@-cd trace && gzip -d *.gz
 
 runanalyse:
 	@-$(TRACEANALYSER) RadixSort_Kernels RadixSort_Kernels_sched RadixSort_Kernels_fusion

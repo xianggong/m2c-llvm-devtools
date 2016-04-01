@@ -94,7 +94,6 @@ rungettrace:
 	@-mkdir trace
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/RecursiveGaussian; scp -r *.rpt xgong@$(MYIP):$(CURDIR)/trace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/RecursiveGaussian; scp -r *.gz xgong@$(MYIP):$(CURDIR)/trace"
-	@-cd trace && gzip -d *.gz
 
 runanalyse:
 	@-$(TRACEANALYSER) RecursiveGaussian_Kernels RecursiveGaussian_Kernels_sched RecursiveGaussian_Kernels_fusion

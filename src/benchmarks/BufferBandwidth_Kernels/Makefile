@@ -94,7 +94,6 @@ rungettrace:
 	@-mkdir trace
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferBandwidth; scp -r *.rpt xgong@$(MYIP):$(CURDIR)/trace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferBandwidth; scp -r *.gz xgong@$(MYIP):$(CURDIR)/trace"
-	@-cd trace && gzip -d *.gz
 
 runanalyse:
 	@-$(TRACEANALYSER) BufferBandwidth_Kernels BufferBandwidth_Kernels_sched BufferBandwidth_Kernels_fusion

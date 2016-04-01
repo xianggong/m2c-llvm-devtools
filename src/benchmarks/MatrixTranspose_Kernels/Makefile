@@ -94,7 +94,6 @@ rungettrace:
 	@-mkdir trace
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MatrixTranspose; scp -r *.rpt xgong@$(MYIP):$(CURDIR)/trace"
 	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/MatrixTranspose; scp -r *.gz xgong@$(MYIP):$(CURDIR)/trace"
-	@-cd trace && gzip -d *.gz
 
 runanalyse:
 	@-$(TRACEANALYSER) MatrixTranspose_Kernels MatrixTranspose_Kernels_sched MatrixTranspose_Kernels_fusion

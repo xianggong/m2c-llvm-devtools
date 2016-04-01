@@ -9,6 +9,7 @@ from bokeh.charts import Histogram, Bar, Donut
 from bokeh.plotting import figure, show, output_file
 from bokeh.io import vplot, gridplot
 from bokeh.charts import defaults
+import os
 
 import tracedatabase as td
 import tracemisc as tm
@@ -36,7 +37,7 @@ class Trace(object):
 
     def get_file_name(self):
         """ Get file name """
-        return self.__file_name
+        return os.path.splitext(self.__file_name)[0]
 
     def get_name_gpu_config(self):
         """ Get name of GPU configuration from file name """
@@ -108,10 +109,10 @@ class Trace(object):
         field_names = [i[0] for i in cursor.description]
         print 'Table: ' + table_name
         for column in field_names:
-            output = '\t' + column.ljust(16)
-            output += str(self.get_column_with_func_cond(table_name,
-                                                         column,
-                                                         func_name))
+            output = '  ' + column.ljust(16)
+            output += '\t' + str(self.get_column_with_func_cond(table_name,
+                                                                column,
+                                                                func_name))
             print output
 
     def get_all_count(self):
@@ -134,8 +135,14 @@ class Trace(object):
             stats['scalar'] = 'SUM'
             stats['simd'] = 'SUM'
             stats['mem_new_all'] = 'SUM'
+            stats['mem_new_all_load'] = 'SUM'
+            stats['mem_new_all_store'] = 'SUM'
             stats['mem_new_lds'] = 'SUM'
+            stats['mem_new_lds_load'] = 'SUM'
+            stats['mem_new_lds_store'] = 'SUM'
             stats['mem_new_mm'] = 'SUM'
+            stats['mem_new_mm_load'] = 'SUM'
+            stats['mem_new_mm_store'] = 'SUM'
         elif table_name == 'inst':
             stats['stall'] = 'SUM'
             stats['fetch'] = 'SUM'
@@ -305,7 +312,7 @@ class Traces(object):
         for trace in self.traces:
             trace.get_all_count()
 
-    def plot(self, table_name, x_column_name, y_column_name):
+    def plot_table_x_y(self, table_name, x_column_name, y_column_name):
         """ Plot traces """
 
         # Output to static HTML file
@@ -371,7 +378,7 @@ class Traces(object):
             df_filter_zero = df[y_column_name].replace(0, np.nan)
             mean = np.round_(df_filter_zero.mean(), 2)
             median = df_filter_zero.median()
-            hist_title = 'Distribution of ' + y_column_name
+            hist_title = y_column_name
             hist_title += ' / avg ' + str(mean)
             hist_title += ' / mid ' + str(median)
             plot_hist = Histogram(df_filter_zero,
@@ -401,7 +408,7 @@ class Traces(object):
                             group='trace',
                             label='catagory',
                             color='color',
-                            legend='top_left',
+                            legend=False,
                             ylabel='Count',
                             title='Statistics')
 
@@ -523,7 +530,7 @@ class Traces(object):
         bars = []
         for access_type_index in range(len(data_df[0])):
             data_df_list = []
-            for index in range(len(data_df)):
+            for index, item in enumerate(data_df):
                 data_df_list.append(data_df[index][access_type_index])
             data_dfs = pd.concat(data_df_list)
             access_location = data_dfs['location'][0]
@@ -537,12 +544,6 @@ class Traces(object):
         # Plot all figures
         plot = gridplot(figures)
         show(plot)
-
-    def plot_memory_stat(self, mode='overview'):
-        prefix = self.trace_files[0].split('_')
-        output_file_name = prefix[0] + "_memory_stat_" + mode + "_"
-        output_file_name += prefix[4]
-        output_file(output_file_name + '.html', title=output_file_name)
 
     def plotMemory(self, mode='stat'):
         # Output to static HTML file
@@ -695,6 +696,9 @@ def main():
                         help='Visualize memory access in histogram')
     args = parser.parse_args()
 
+    # Sort the files in human natural order
+    args.traceFiles.sort(key=tm.natural_keys)
+
     # Traces
     traces = Traces(args.traceFiles)
 
@@ -703,7 +707,7 @@ def main():
         traces.stat()
 
     if args.visual:
-        traces.plot(args.table[0], args.xaxis[0], args.yaxis[0])
+        traces.plot_table_x_y(args.table[0], args.xaxis[0], args.yaxis[0])
 
     if args.pipeline:
         traces.plotPipeline(args.cuid[0])

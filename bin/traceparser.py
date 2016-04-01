@@ -73,6 +73,31 @@ def get_asm(line):
     return parse_as_string('asm', line)
 
 
+def get_inst_type(line):
+    """ Decode instruction type """
+    asm = parse_as_string('asm', line)
+
+    is_scalar = 0
+    is_mem = 0
+    is_load = 0
+    is_ds = 0
+
+    if asm.split('_')[0] == 's':
+        is_scalar = 1
+
+    if asm.split('_')[0] == 'ds':
+        is_ds = 1
+
+    if 'load' in asm:
+        is_mem = 1
+        is_load = 1
+    elif 'store' in asm:
+        is_mem = 1
+        is_load = 0
+
+    return is_scalar << 3 + is_mem << 2 + is_load << 1 + is_ds
+
+
 def get_name(line):
     """ Decode name """
     return parse_as_string('name', line)

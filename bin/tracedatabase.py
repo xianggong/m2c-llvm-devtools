@@ -1,9 +1,12 @@
 #!/usr/bin/python
 """ This module contains helper functions to build database """
 
+import gzip
 import os
 import sqlite3
 import re
+import tables
+import pandas as pd
 
 import traceparser as tp
 
@@ -16,9 +19,15 @@ STAT_LDS = 5
 STAT_SCALAR = 6
 STAT_SIMD = 7
 STAT_MEM_NEW_ALL = 8
-STAT_MEM_NEW_LDS = 9
-STAT_MEM_NEW_MM = 10
-STAT_COUNT = 11
+STAT_MEM_NEW_ALL_LOAD = 9
+STAT_MEM_NEW_ALL_STORE = 10
+STAT_MEM_NEW_LDS = 11
+STAT_MEM_NEW_LDS_LOAD = 12
+STAT_MEM_NEW_LDS_STORE = 13
+STAT_MEM_NEW_MM = 14
+STAT_MEM_NEW_MM_LOAD = 15
+STAT_MEM_NEW_MM_STORE = 16
+STAT_COUNT = 17
 
 INST_START = 0
 INST_LENGTH = 1
@@ -35,7 +44,8 @@ INST_ASM = 11
 INST_LIFELITE = 12
 INST_LIFE = 13
 INST_LINE = 14
-INST_COUNT = 15
+INST_TYPE = 15
+INST_COUNT = 16
 
 MEM_NAME = 0
 MEM_ACCESS_TYPE = 1
@@ -60,8 +70,16 @@ class DatabaseBuilder(object):
     """ Database builder for trace """
 
     def __init__(self, trace_name):
-        self.__trace_name = trace_name
-        self.__trace = open(trace_name, "r")
+        self.__trace_name = None
+        self.__trace = None
+
+        if trace_name.endswith('.gz'):
+            with gzip.open(trace_name, 'rb') as trace_gz:
+                self.__trace_name = os.path.splitext(trace_name)[0]
+                self.__trace = trace_gz.readlines()
+        else:
+            self.__trace_name = trace_name
+            self.__trace = open(trace_name, "r")
 
         # Initialize statistics hashtables
         self.__stat_view = {}
@@ -71,6 +89,12 @@ class DatabaseBuilder(object):
         self.__inst_view = {}
 
         self.__mem_view = {}
+
+    def __get_name(self, suffix):
+        return self.__trace_name + suffix
+
+    def __get_database_name(self):
+        return self.__get_name('.db')
 
     def __inc_count(self, stat_name, cycle):
         """ Increment count of a statistic """
@@ -161,9 +185,10 @@ class DatabaseBuilder(object):
                 wf_id = tp.get_wf(line)
                 uop = tp.get_uop(line)
                 asm = tp.get_asm(line)
+                inst_type = tp.get_inst_type(line)
 
                 self.__inst_view[inst_id] = [0, 0, 0, 0, 0, 0, 0,
-                                             0, 0, 0, 0, asm, "", "", 0]
+                                             0, 0, 0, 0, asm, "", "", 0, 0]
                 self.__set_inst_field(INST_START, cycle, line)
                 self.__set_inst_field(INST_CU, cu_id, line)
                 self.__set_inst_field(INST_IB, ib_id, line)
@@ -172,6 +197,7 @@ class DatabaseBuilder(object):
                 self.__set_inst_field(INST_UOP, uop, line)
                 self.__set_inst_field(INST_ASM, asm, line)
                 self.__set_inst_field(INST_LINE, line_num, line)
+                self.__set_inst_field(INST_TYPE, inst_type, line)
 
                 # Also handle stg="f"
                 self.__inc_count(STAT_FETCH, cycle)
@@ -217,11 +243,24 @@ class DatabaseBuilder(object):
         """ Parse memory info """
         if 'mem.' in line:
             if 'mem.new_access ' in line:
+                # Update counters
                 self.__inc_count(STAT_MEM_NEW_ALL, cycle)
+                if 'load' in line:
+                    self.__inc_count(STAT_MEM_NEW_ALL_LOAD, cycle)
+                elif 'store' in line:
+                    self.__inc_count(STAT_MEM_NEW_ALL_STORE, cycle)
                 if 'LDS' in line:
                     self.__inc_count(STAT_MEM_NEW_LDS, cycle)
+                    if 'load' in line:
+                        self.__inc_count(STAT_MEM_NEW_LDS_LOAD, cycle)
+                    elif 'store' in line:
+                        self.__inc_count(STAT_MEM_NEW_LDS_STORE, cycle)
                 else:
                     self.__inc_count(STAT_MEM_NEW_MM, cycle)
+                    if 'load' in line:
+                        self.__inc_count(STAT_MEM_NEW_MM_LOAD, cycle)
+                    elif 'store' in line:
+                        self.__inc_count(STAT_MEM_NEW_MM_STORE, cycle)
 
                 mem_access_name = tp.get_name(line)
                 mem_access_addr = tp.get_name(line)
@@ -270,7 +309,7 @@ class DatabaseBuilder(object):
 
     def __write_database_stat(self):
         """ Write stat to database """
-        database = sqlite3.connect(self.__trace_name + '.db')
+        database = sqlite3.connect(self.__get_database_name())
         cursor = database.cursor()
 
         # Create stat view table
@@ -280,7 +319,10 @@ class DatabaseBuilder(object):
              branch INTEGER, mem INTEGER,
              lds INTEGER, scalar INTEGER,
              simd INTEGER, mem_new_all INTEGER,
-             mem_new_lds INTEGER, mem_new_mm INTEGER)''')
+             mem_new_all_load INTEGER, mem_new_all_store INTEGER,
+             mem_new_lds INTEGER, mem_new_lds_load INTEGER,
+             mem_new_lds_store INTEGER, mem_new_mm INTEGER,
+             mem_new_mm_load INTEGER, mem_new_mm_store INTEGER)''')
 
         # Add stat view data
         for key in self.__stat_view[STAT_STALL].keys():
@@ -294,16 +336,28 @@ class DatabaseBuilder(object):
             scalar = self.__stat_view[STAT_SCALAR][key]
             simd = self.__stat_view[STAT_SIMD][key]
             mem_new_all = self.__stat_view[STAT_MEM_NEW_ALL][key]
+            mem_new_all_load = self.__stat_view[STAT_MEM_NEW_ALL_LOAD][key]
+            mem_new_all_store = self.__stat_view[STAT_MEM_NEW_ALL_STORE][key]
             mem_new_lds = self.__stat_view[STAT_MEM_NEW_LDS][key]
+            mem_new_lds_load = self.__stat_view[STAT_MEM_NEW_LDS_LOAD][key]
+            mem_new_lds_store = self.__stat_view[STAT_MEM_NEW_LDS_STORE][key]
             mem_new_mm = self.__stat_view[STAT_MEM_NEW_MM][key]
+            mem_new_mm_load = self.__stat_view[STAT_MEM_NEW_MM_LOAD][key]
+            mem_new_mm_store = self.__stat_view[STAT_MEM_NEW_MM_STORE][key]
 
             cursor.execute('INSERT INTO cycle VALUES\
                            (?, ?, ?, ?, \
                             ?, ?, ?, ?, \
-                            ?, ?, ?, ?)',
+                            ?, ?, ?, ?, \
+                            ?, ?, ?, ?, \
+                            ?, ?)',
                            (cycle, stall, fetch, issue,
                             branch, mem, lds, scalar,
-                            simd, mem_new_all, mem_new_lds, mem_new_mm))
+                            simd, mem_new_all,
+                            mem_new_all_load, mem_new_all_store,
+                            mem_new_lds, mem_new_lds_load,
+                            mem_new_lds_store, mem_new_mm,
+                            mem_new_mm_load, mem_new_mm_store))
 
         # Save (commit) the changes
         database.commit()
@@ -314,7 +368,7 @@ class DatabaseBuilder(object):
 
     def __write_database_inst(self):
         """ Write inst to database """
-        database = sqlite3.connect(self.__trace_name + '.db')
+        database = sqlite3.connect(self.__get_database_name())
         cursor = database.cursor()
 
         # Create instruction view table
@@ -364,7 +418,7 @@ class DatabaseBuilder(object):
 
     def __write_database_mem(self):
         """ Write mem to database """
-        database = sqlite3.connect(self.__trace_name + '.db')
+        database = sqlite3.connect(self.__get_database_name())
         cursor = database.cursor()
 
         # Create memory access table
@@ -431,13 +485,14 @@ class DatabaseBuilder(object):
         self.__parse_trace()
         self.__write_database()
         if os.path.isfile(self.__trace_name + ".db"):
-            return sqlite3.connect(self.__trace_name + '.db')
+            return sqlite3.connect(self.__get_database_name())
 
 
 def load_database(trace_name):
     """ Load database """
-    if os.path.isfile(trace_name + ".db"):
-        return sqlite3.connect(trace_name + '.db')
+    trace_db_name = os.path.splitext(trace_name)[0] + '.db'
+    if os.path.isfile(trace_db_name):
+        return sqlite3.connect(trace_db_name)
     else:
         db_builder = DatabaseBuilder(trace_name)
         return db_builder.run()
