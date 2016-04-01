@@ -4,6 +4,12 @@ import re
 import pandas as pd
 
 INDEX = [
+    'GPUConf',
+    'InstSched',
+    'WorkSize',
+    'ModuleName',
+    'MOduleId',
+
     'Sets',
     'Assoc',
     'Policy',
@@ -58,8 +64,9 @@ INDEX = [
 ]
 
 
-def __parse(report):
+def __parse(report_file):
     """ Parse report """
+    report = open(report_file, 'r')
     mem_info = {}
     curr_module = None
     for line in report:
@@ -71,7 +78,12 @@ def __parse(report):
         module = re.search(r'[\[]\s(?P<module_name>\w+\-\w+)\s[\]]', line)
         module_name = module.groupdict()['module_name'] if module else None
         if module_name:
-            mem_info[module_name] = []
+            report_conf = report_file.split('.')[0].split('_')
+            mem_info[module_name] = [report_conf[0],
+                                     report_conf[2],
+                                     report_conf[3],
+                                     module_name.split('-')[0],
+                                     module_name.split('-')[1]]
             curr_module = module_name
             continue
 
@@ -89,11 +101,9 @@ def __parse(report):
 
     dataframe = pd.DataFrame(mem_info, index=INDEX)
     dataframe = dataframe.transpose()
-    print dataframe
-    return mem_info
+    return dataframe
 
 
 def get_df(report_file):
     """ Return dataframe of the report """
-    report = open(report_file, 'r')
-    return __parse(report)
+    return __parse(report_file)
