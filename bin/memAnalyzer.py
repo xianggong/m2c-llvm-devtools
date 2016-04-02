@@ -4,6 +4,7 @@
 
 import argparse
 import collections
+import numpy as np
 import pandas as pd
 from bokeh.charts import Bar
 from bokeh.plotting import show, output_file
@@ -35,6 +36,74 @@ class Report(object):
         if report_file:
             self.__dataframe = mp.get_df(report_file)
 
+    def __sub__(self, other):
+        """ Substract 2 report """
+        my_df = self.__dataframe
+        other_df = other.get_dataframe()
+
+        col_index = ['GPUConf',
+                     'InstSched',
+                     'WorkSize',
+                     'ModuleName',
+                     'ModuleId',
+
+                     'Sets',
+                     'Assoc',
+                     'Policy',
+                     'BlockSize',
+                     'Latency',
+                     'Ports']
+
+        sub_index = ['Accesses',
+                     'Hits',
+                     'Misses',
+                     'HitRatio',
+                     'Evictions',
+                     'Retries',
+
+                     'Reads',
+                     'ReadRetries',
+                     'BlockingReads',
+                     'NonBlockingReads',
+                     'ReadHits',
+                     'ReadMisses',
+
+                     'Writes',
+                     'WriteRetries',
+                     'BlockingWrites',
+                     'NonBlockingWrites',
+                     'WriteHits',
+                     'WriteMisses',
+
+                     'NCWrites',
+                     'NCWriteRetries',
+                     'NCBlockingWrites',
+                     'NCNonBlockingWrites',
+                     'NCWriteHits',
+                     'NCWriteMisses',
+                     'Prefetches',
+                     'PrefetchAborts',
+                     'UselessPrefetches',
+
+                     'NoRetryAccesses',
+                     'NoRetryHits',
+                     'NoRetryMisses',
+                     'NoRetryHitRatio',
+                     'NoRetryReads',
+                     'NoRetryReadHits',
+                     'NoRetryReadMisses',
+                     'NoRetryWrites',
+                     'NoRetryWriteHits',
+                     'NoRetryWriteMisses',
+                     'NoRetryNCWrites',
+                     'NoRetryNCWriteHits',
+                     'NoRetryNCWriteMisses']
+
+        unchanged_df = my_df[col_index]
+        substract_df = my_df[sub_index] - other_df[sub_index]
+        self.__dataframe = pd.concat([unchanged_df, substract_df], axis=1)
+        return self.__dataframe
+
     def get_dataframe(self):
         """ Get associated dataframe """
         return self.__dataframe
@@ -64,38 +133,41 @@ class Report(object):
                                   value_vars=['Hits', 'Misses'],
                                   var_name='type',
                                   value_name='count')
-        access_df_misc = pd.melt(access_df,
-                                 id_vars='ModuleId',
-                                 value_vars=['Evictions', 'Retries'],
-                                 var_name='group',
-                                 value_name='count')
 
         if not is_all_zeros(access_df['HitRatio']):
+            mean = np.round_(access_df['HitRatio'].mean(), 4)
             bar_ratio = Bar(access_df,
                             values='HitRatio',
                             label='ModuleId',
                             xlabel=module_name,
-                            ylabel='Hit Ratio')
+                            ylabel='Hit Ratio',
+                            title='Avg ' + str(mean))
             figures_module.append(bar_ratio)
 
-        bar_count = Bar(access_df_count,
-                        values='count',
-                        label='ModuleId',
-                        stack='type',
-                        legend='top_right',
-                        xlabel=module_name,
-                        ylabel='Access count')
-        figures_module.append(bar_count)
+        if not is_all_zeros(access_df_count['count']):
+            mean = np.round_(access_df_count['count'].mean(), 4)
+            bar_count = Bar(access_df_count,
+                            values='count',
+                            label='ModuleId',
+                            stack='type',
+                            legend='top_right',
+                            xlabel=module_name,
+                            ylabel='Access count',
+                            title='Avg ' + str(mean))
+            figures_module.append(bar_count)
 
-        if not is_all_zeros(access_df_misc['count']):
-            bar_misc = Bar(access_df_misc,
-                           label='ModuleId',
-                           values='count',
-                           group='group',
-                           legend='top_right',
-                           xlabel=module_name,
-                           ylabel='Count')
-            figures_module.append(bar_misc)
+        columns_misc = ['Evictions', 'Retries']
+        for column in columns_misc:
+            dataframe = access_df[column]
+            if not is_all_zeros(dataframe):
+                mean = np.round_(dataframe.mean(), 4)
+                bar_misc = Bar(access_df,
+                               values=column,
+                               label='ModuleId',
+                               xlabel=module_name,
+                               ylabel='Count',
+                               title=column + ' avg=' + str(mean))
+                figures_module.append(bar_misc)
 
         return figures_module
 
@@ -119,32 +191,30 @@ class Report(object):
                                   value_vars=['ReadHits', 'ReadMisses'],
                                   var_name='type',
                                   value_name='count')
-        access_df_misc = pd.melt(access_df,
-                                 id_vars='ModuleId',
-                                 value_vars=['ReadRetries',
-                                             'BlockingReads',
-                                             'NonBlockingReads'],
-                                 var_name='group',
-                                 value_name='count')
+        if not is_all_zeros(access_df_count['count']):
+            mean = np.round_(access_df_count['count'].mean(), 4)
+            bar_count = Bar(access_df_count,
+                            values='count',
+                            label='ModuleId',
+                            stack='type',
+                            legend='top_right',
+                            xlabel=module_name,
+                            ylabel='Access count',
+                            title='Avg ' + str(mean))
+            figures_module.append(bar_count)
 
-        bar_count = Bar(access_df_count,
-                        values='count',
-                        label='ModuleId',
-                        stack='type',
-                        legend='top_right',
-                        xlabel=module_name,
-                        ylabel='Access count')
-        figures_module.append(bar_count)
-
-        if not is_all_zeros(access_df_misc['count']):
-            bar_misc = Bar(access_df_misc,
-                           label='ModuleId',
-                           values='count',
-                           group='group',
-                           legend='top_right',
-                           xlabel=module_name,
-                           ylabel='Count')
-            figures_module.append(bar_misc)
+        columns_misc = ['ReadRetries', 'BlockingReads', 'NonBlockingReads']
+        for column in columns_misc:
+            dataframe = access_df[column]
+            if not is_all_zeros(dataframe):
+                mean = np.round_(dataframe.mean(), 4)
+                bar_misc = Bar(access_df,
+                               values=column,
+                               label='ModuleId',
+                               xlabel=module_name,
+                               ylabel='Count',
+                               title=column + ' avg=' + str(mean))
+                figures_module.append(bar_misc)
 
         return figures_module
 
@@ -168,33 +238,33 @@ class Report(object):
                                   value_vars=['WriteHits', 'WriteMisses'],
                                   var_name='type',
                                   value_name='count')
-        access_df_misc = pd.melt(access_df,
-                                 id_vars='ModuleId',
-                                 value_vars=['WriteRetries',
-                                             'BlockingWrites',
-                                             'NonBlockingWrites'],
-                                 var_name='group',
-                                 value_name='count')
 
         if not is_all_zeros(access_df_count['count']):
+            mean = np.round_(access_df_count['count'].mean(), 4)
             bar_count = Bar(access_df_count,
                             values='count',
                             label='ModuleId',
                             stack='type',
                             legend='top_right',
                             xlabel=module_name,
-                            ylabel='Access count')
+                            ylabel='Access count',
+                            title='Avg ' + str(mean))
             figures_module.append(bar_count)
 
-        if not is_all_zeros(access_df_misc['count']):
-            bar_misc = Bar(access_df_misc,
-                           label='ModuleId',
-                           values='count',
-                           group='group',
-                           legend='top_right',
-                           xlabel=module_name,
-                           ylabel='Count')
-            figures_module.append(bar_misc)
+        columns_misc = ['WriteRetries',
+                        'BlockingWrites',
+                        'NonBlockingWrites']
+        for column in columns_misc:
+            dataframe = access_df[column]
+            if not is_all_zeros(dataframe):
+                mean = np.round_(dataframe.mean(), 4)
+                bar_misc = Bar(access_df,
+                               values=column,
+                               label='ModuleId',
+                               xlabel=module_name,
+                               ylabel='Count',
+                               title=column + ' avg=' + str(mean))
+                figures_module.append(bar_misc)
 
         return figures_module
 
@@ -222,36 +292,36 @@ class Report(object):
                                   value_vars=['NCWriteHits', 'NCWriteMisses'],
                                   var_name='type',
                                   value_name='count')
-        access_df_misc = pd.melt(access_df,
-                                 id_vars='ModuleId',
-                                 value_vars=['NCWriteRetries',
-                                             'NCBlockingWrites',
-                                             'NCNonBlockingWrites',
-                                             'Prefetches',
-                                             'PrefetchAborts',
-                                             'UselessPrefetches'],
-                                 var_name='group',
-                                 value_name='count')
 
         if not is_all_zeros(access_df_count['count']):
+            mean = np.round_(access_df_count['count'].mean(), 4)
             bar_count = Bar(access_df_count,
                             values='count',
                             label='ModuleId',
                             stack='type',
                             legend='top_right',
                             xlabel=module_name,
-                            ylabel='Access count')
+                            ylabel='Access count',
+                            title='Avg ' + str(mean))
             figures_module.append(bar_count)
 
-        if not is_all_zeros(access_df_misc['count']):
-            bar_misc = Bar(access_df_misc,
-                           label='ModuleId',
-                           values='count',
-                           group='group',
-                           legend='top_right',
-                           xlabel=module_name,
-                           ylabel='Count')
-            figures_module.append(bar_misc)
+        columns_misc = ['NCWriteRetries',
+                        'NCBlockingWrites',
+                        'NCNonBlockingWrites',
+                        'Prefetches',
+                        'PrefetchAborts',
+                        'UselessPrefetches']
+        for column in columns_misc:
+            dataframe = access_df[column]
+            if not is_all_zeros(dataframe):
+                mean = np.round_(dataframe.mean(), 4)
+                bar_misc = Bar(access_df,
+                               values=column,
+                               label='ModuleId',
+                               xlabel=module_name,
+                               ylabel='Count',
+                               title=column + ' avg=' + str(mean))
+                figures_module.append(bar_misc)
 
         return figures_module
 
@@ -305,21 +375,25 @@ class Report(object):
                                           value_name='count')
 
         if not is_all_zeros(access_df['NoRetryHitRatio']):
+            mean = np.round_(access_df['NoRetryHitRatio'].mean(), 4)
             bar_ratio = Bar(access_df,
                             values='NoRetryHitRatio',
                             label='ModuleId',
                             xlabel=module_name,
-                            ylabel='Hit Ratio')
+                            ylabel='Hit Ratio',
+                            title='Avg ' + str(mean))
             figures_module.append(bar_ratio)
 
         if not is_all_zeros(access_df_count['count']):
+            mean = np.round_(access_df_count['count'].mean(), 4)
             bar_count = Bar(access_df_count,
                             values='count',
                             label='ModuleId',
                             stack='type',
                             legend='top_right',
                             xlabel=module_name,
-                            ylabel='Access count')
+                            ylabel='Access count',
+                            title='Avg ' + str(mean))
             figures_module.append(bar_count)
 
         access_df_misc = [access_df_count_read,
@@ -327,13 +401,15 @@ class Report(object):
                           access_df_count_ncwrite]
         for dataframe in access_df_misc:
             if not is_all_zeros(dataframe['count']):
+                mean = np.round_(dataframe['count'].mean(), 4)
                 bar_count = Bar(dataframe,
                                 values='count',
                                 label='ModuleId',
                                 stack='type',
                                 legend='top_right',
                                 xlabel=module_name,
-                                ylabel='Access count')
+                                ylabel='Access count',
+                                title='Avg ' + str(mean))
                 figures_module.append(bar_count)
 
         return figures_module
@@ -379,9 +455,11 @@ class Reports(object):
             self.__reports.append(Report(report))
 
         # Substract dataframe
+        for index in range(1, len(self.__reports)):
+            self.__reports[index] - self.__reports[0]
 
     def plot(self):
-
+        """ Plot """
         output_file_name = 'mem_report'
         output_file_name += '.html'
         output_file_title = 'Mem report'
