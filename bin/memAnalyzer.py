@@ -15,8 +15,8 @@ import memparser as mp
 
 SCREEN_WIDTH = 1560
 
-defaults.width = int(SCREEN_WIDTH * 0.22)
-defaults.height = defaults.width
+defaults.width = int(SCREEN_WIDTH * 0.3)
+defaults.height = int(SCREEN_WIDTH * 0.22)
 
 
 def is_all_zeros(column):
@@ -36,7 +36,7 @@ class Report(object):
         if report_file:
             self.__dataframe = mp.get_df(report_file)
 
-    def __sub__(self, other):
+    def substract(self, other):
         """ Substract 2 report """
         my_df = self.__dataframe
         other_df = other.get_dataframe()
@@ -102,7 +102,6 @@ class Report(object):
         unchanged_df = my_df[col_index]
         substract_df = my_df[sub_index] - other_df[sub_index]
         self.__dataframe = pd.concat([unchanged_df, substract_df], axis=1)
-        return self.__dataframe
 
     def get_dataframe(self):
         """ Get associated dataframe """
@@ -112,6 +111,40 @@ class Report(object):
         """ Get dataframe by module name """
         dataframe = self.__dataframe
         return dataframe.loc[dataframe['ModuleName'] == module_name]
+
+    def __get_figure_bar(self, dataframe_main, column_name, xlabel, ylabel):
+        if not is_all_zeros(dataframe_main[column_name]):
+            mean = np.round_(dataframe_main[column_name].mean(), 4)
+            bar_ratio = Bar(dataframe_main,
+                            values=column_name,
+                            label='ModuleId',
+                            xlabel=xlabel,
+                            ylabel=ylabel,
+                            title='Avg: ' + column_name + '=' + str(mean))
+            return bar_ratio
+
+    def __get_figure_bar_stack(self, dataframe_main, column_names,
+                               xlabel, ylabel):
+        dataframe_melt = pd.melt(dataframe_main,
+                                 id_vars='ModuleId',
+                                 value_vars=column_names,
+                                 var_name='type',
+                                 value_name='count')
+        if not is_all_zeros(dataframe_melt['count']):
+            title = 'Avg:'
+            for column in column_names:
+                mean = np.round_(dataframe_main[column].mean(), 4)
+                title += column + '=' + str(mean) + ' '
+            mean = np.round_(dataframe_melt['count'].mean(), 4)
+            bar_stack = Bar(dataframe_melt,
+                            values='count',
+                            label='ModuleId',
+                            stack='type',
+                            legend='top_right',
+                            xlabel=xlabel,
+                            ylabel=ylabel,
+                            title=title)
+            return bar_stack
 
     def __get_figures_module_access(self, module_name='l1'):
         module_df = self.get_dataframe_by_module(module_name)
@@ -128,46 +161,25 @@ class Report(object):
                        'Evictions',
                        'Retries']
         access_df = module_df[access_cols]
-        access_df_count = pd.melt(access_df,
-                                  id_vars='ModuleId',
-                                  value_vars=['Hits', 'Misses'],
-                                  var_name='type',
-                                  value_name='count')
 
-        if not is_all_zeros(access_df['HitRatio']):
-            mean = np.round_(access_df['HitRatio'].mean(), 4)
-            bar_ratio = Bar(access_df,
-                            values='HitRatio',
-                            label='ModuleId',
-                            xlabel=module_name,
-                            ylabel='Hit Ratio',
-                            title='Avg ' + str(mean))
-            figures_module.append(bar_ratio)
+        fig_bar = self.__get_figure_bar(access_df, 'HitRatio',
+                                        module_name, 'Hit Ratio')
+        if fig_bar:
+            figures_module.append(fig_bar)
 
-        if not is_all_zeros(access_df_count['count']):
-            mean = np.round_(access_df_count['count'].mean(), 4)
-            bar_count = Bar(access_df_count,
-                            values='count',
-                            label='ModuleId',
-                            stack='type',
-                            legend='top_right',
-                            xlabel=module_name,
-                            ylabel='Access count',
-                            title='Avg ' + str(mean))
-            figures_module.append(bar_count)
+        fig_bar_stack = self.__get_figure_bar_stack(access_df,
+                                                    ['Hits', 'Misses'],
+                                                    module_name,
+                                                    'Access Count')
+        if fig_bar_stack:
+            figures_module.append(fig_bar_stack)
 
         columns_misc = ['Evictions', 'Retries']
         for column in columns_misc:
-            dataframe = access_df[column]
-            if not is_all_zeros(dataframe):
-                mean = np.round_(dataframe.mean(), 4)
-                bar_misc = Bar(access_df,
-                               values=column,
-                               label='ModuleId',
-                               xlabel=module_name,
-                               ylabel='Count',
-                               title=column + ' avg=' + str(mean))
-                figures_module.append(bar_misc)
+            fig_bar = self.__get_figure_bar(
+                access_df, column, module_name, 'Count')
+            if fig_bar:
+                figures_module.append(fig_bar)
 
         return figures_module
 
@@ -186,35 +198,19 @@ class Report(object):
                        'ReadHits',
                        'ReadMisses']
         access_df = module_df[access_cols]
-        access_df_count = pd.melt(access_df,
-                                  id_vars='ModuleId',
-                                  value_vars=['ReadHits', 'ReadMisses'],
-                                  var_name='type',
-                                  value_name='count')
-        if not is_all_zeros(access_df_count['count']):
-            mean = np.round_(access_df_count['count'].mean(), 4)
-            bar_count = Bar(access_df_count,
-                            values='count',
-                            label='ModuleId',
-                            stack='type',
-                            legend='top_right',
-                            xlabel=module_name,
-                            ylabel='Access count',
-                            title='Avg ' + str(mean))
-            figures_module.append(bar_count)
+
+        fig_bar_stack = self.__get_figure_bar_stack(access_df,
+                                                    ['ReadHits', 'ReadMisses'],
+                                                    module_name,
+                                                    'Access Count')
+        figures_module.append(fig_bar_stack)
 
         columns_misc = ['ReadRetries', 'BlockingReads', 'NonBlockingReads']
         for column in columns_misc:
-            dataframe = access_df[column]
-            if not is_all_zeros(dataframe):
-                mean = np.round_(dataframe.mean(), 4)
-                bar_misc = Bar(access_df,
-                               values=column,
-                               label='ModuleId',
-                               xlabel=module_name,
-                               ylabel='Count',
-                               title=column + ' avg=' + str(mean))
-                figures_module.append(bar_misc)
+            fig_bar = self.__get_figure_bar(
+                access_df, column, module_name, 'Count')
+            if fig_bar:
+                figures_module.append(fig_bar)
 
         return figures_module
 
@@ -233,38 +229,21 @@ class Report(object):
                        'WriteHits',
                        'WriteMisses']
         access_df = module_df[access_cols]
-        access_df_count = pd.melt(access_df,
-                                  id_vars='ModuleId',
-                                  value_vars=['WriteHits', 'WriteMisses'],
-                                  var_name='type',
-                                  value_name='count')
 
-        if not is_all_zeros(access_df_count['count']):
-            mean = np.round_(access_df_count['count'].mean(), 4)
-            bar_count = Bar(access_df_count,
-                            values='count',
-                            label='ModuleId',
-                            stack='type',
-                            legend='top_right',
-                            xlabel=module_name,
-                            ylabel='Access count',
-                            title='Avg ' + str(mean))
-            figures_module.append(bar_count)
+        fig_bar_stack = self.__get_figure_bar_stack(
+            access_df, ['WriteHits', 'WriteMisses'],
+            module_name, 'Access Count')
+        if fig_bar_stack:
+            figures_module.append(fig_bar_stack)
 
         columns_misc = ['WriteRetries',
                         'BlockingWrites',
                         'NonBlockingWrites']
         for column in columns_misc:
-            dataframe = access_df[column]
-            if not is_all_zeros(dataframe):
-                mean = np.round_(dataframe.mean(), 4)
-                bar_misc = Bar(access_df,
-                               values=column,
-                               label='ModuleId',
-                               xlabel=module_name,
-                               ylabel='Count',
-                               title=column + ' avg=' + str(mean))
-                figures_module.append(bar_misc)
+            fig_bar = self.__get_figure_bar(
+                access_df, column, module_name, 'Count')
+            if fig_bar:
+                figures_module.append(fig_bar)
 
         return figures_module
 
@@ -284,26 +263,14 @@ class Report(object):
                        'NCWriteMisses',
                        'Prefetches',
                        'PrefetchAborts',
-                       'UselessPrefetches'
-                       ]
+                       'UselessPrefetches']
         access_df = module_df[access_cols]
-        access_df_count = pd.melt(access_df,
-                                  id_vars='ModuleId',
-                                  value_vars=['NCWriteHits', 'NCWriteMisses'],
-                                  var_name='type',
-                                  value_name='count')
 
-        if not is_all_zeros(access_df_count['count']):
-            mean = np.round_(access_df_count['count'].mean(), 4)
-            bar_count = Bar(access_df_count,
-                            values='count',
-                            label='ModuleId',
-                            stack='type',
-                            legend='top_right',
-                            xlabel=module_name,
-                            ylabel='Access count',
-                            title='Avg ' + str(mean))
-            figures_module.append(bar_count)
+        fig_bar_stack = self.__get_figure_bar_stack(
+            access_df, ['NCWriteHits', 'NCWriteMisses'],
+            module_name, 'Access Count')
+        if fig_bar_stack:
+            figures_module.append(fig_bar_stack)
 
         columns_misc = ['NCWriteRetries',
                         'NCBlockingWrites',
@@ -312,16 +279,10 @@ class Report(object):
                         'PrefetchAborts',
                         'UselessPrefetches']
         for column in columns_misc:
-            dataframe = access_df[column]
-            if not is_all_zeros(dataframe):
-                mean = np.round_(dataframe.mean(), 4)
-                bar_misc = Bar(access_df,
-                               values=column,
-                               label='ModuleId',
-                               xlabel=module_name,
-                               ylabel='Count',
-                               title=column + ' avg=' + str(mean))
-                figures_module.append(bar_misc)
+            fig_bar = self.__get_figure_bar(
+                access_df, column, module_name, 'Count')
+            if fig_bar:
+                figures_module.append(fig_bar)
 
         return figures_module
 
@@ -347,70 +308,29 @@ class Report(object):
                        'NoRetryNCWriteHits',
                        'NoRetryNCWriteMisses']
         access_df = module_df[access_cols]
-        access_df_count = pd.melt(access_df,
-                                  id_vars='ModuleId',
-                                  value_vars=['NoRetryHits',
-                                              'NoRetryMisses'],
-                                  var_name='type',
-                                  value_name='count')
-        access_df_count_read = pd.melt(access_df,
-                                       id_vars='ModuleId',
-                                       value_vars=['NoRetryReadHits',
-                                                   'NoRetryReadMisses'],
-                                       var_name='type',
-                                       value_name='count')
 
-        access_df_count_write = pd.melt(access_df,
-                                        id_vars='ModuleId',
-                                        value_vars=['NoRetryWriteHits',
-                                                    'NoRetryWriteMisses'],
-                                        var_name='type',
-                                        value_name='count')
+        fig_bar = self.__get_figure_bar(
+            access_df, 'NoRetryHitRatio', module_name, 'NoRetryHitRatio')
+        if fig_bar:
+            figures_module.append(fig_bar)
 
-        access_df_count_ncwrite = pd.melt(access_df,
-                                          id_vars='ModuleId',
-                                          value_vars=['NoRetryNCWriteHits',
-                                                      'NoRetryNCWriteMisses'],
-                                          var_name='type',
-                                          value_name='count')
+        fig_bar_stack = self.__get_figure_bar_stack(
+            access_df, ['NoRetryHits', 'NoRetryMisses'],
+            module_name, 'Access Count')
+        if fig_bar_stack:
+            figures_module.append(fig_bar_stack)
 
-        if not is_all_zeros(access_df['NoRetryHitRatio']):
-            mean = np.round_(access_df['NoRetryHitRatio'].mean(), 4)
-            bar_ratio = Bar(access_df,
-                            values='NoRetryHitRatio',
-                            label='ModuleId',
-                            xlabel=module_name,
-                            ylabel='Hit Ratio',
-                            title='Avg ' + str(mean))
-            figures_module.append(bar_ratio)
+        fig_bar_stack = self.__get_figure_bar_stack(
+            access_df, ['NoRetryWriteHits', 'NoRetryWriteMisses'],
+            module_name, 'Access Count')
+        if fig_bar_stack:
+            figures_module.append(fig_bar_stack)
 
-        if not is_all_zeros(access_df_count['count']):
-            mean = np.round_(access_df_count['count'].mean(), 4)
-            bar_count = Bar(access_df_count,
-                            values='count',
-                            label='ModuleId',
-                            stack='type',
-                            legend='top_right',
-                            xlabel=module_name,
-                            ylabel='Access count',
-                            title='Avg ' + str(mean))
-            figures_module.append(bar_count)
-
-        access_df_misc = [access_df_count_read,
-                          access_df_count_write,
-                          access_df_count_ncwrite]
-        for dataframe in access_df_misc:
-            if not is_all_zeros(dataframe['count']):
-                mean = np.round_(dataframe['count'].mean(), 4)
-                bar_count = Bar(dataframe,
-                                values='count',
-                                label='ModuleId',
-                                stack='type',
-                                legend='top_right',
-                                xlabel=module_name,
-                                ylabel='Access count',
-                                title='Avg ' + str(mean))
-                figures_module.append(bar_count)
+        fig_bar_stack = self.__get_figure_bar_stack(
+            access_df, ['NoRetryNCWriteHits', 'NoRetryNCWriteMisses'],
+            module_name, 'Access Count')
+        if fig_bar_stack:
+            figures_module.append(fig_bar_stack)
 
         return figures_module
 
@@ -448,15 +368,16 @@ class Report(object):
 class Reports(object):
     """ Plotter for memory reports """
 
-    def __init__(self, report_files):
+    def __init__(self, report_files, enable_substract=True):
         self.__report_files = report_files
         self.__reports = []
         for report in self.__report_files:
             self.__reports.append(Report(report))
 
         # Substract dataframe
-        for index in range(1, len(self.__reports)):
-            self.__reports[index] - self.__reports[0]
+        if enable_substract:
+            for index in range(1, len(self.__reports)):
+                self.__reports[index].substract(self.__reports[0])
 
     def plot(self):
         """ Plot """
@@ -498,9 +419,13 @@ def main():
         description='Multi2Sim simulation memory report analyzer')
     parser.add_argument('memRptFiles', nargs='+',
                         help='Multi2Sim memory report files')
+    parser.add_argument("-s", "--substract",
+                        action="store_true",
+                        help='Substract the 1st file')
+
     args = parser.parse_args()
 
-    reports = Reports(args.memRptFiles)
+    reports = Reports(args.memRptFiles, args.substract)
     reports.plot()
 
 if __name__ == '__main__':
