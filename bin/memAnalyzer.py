@@ -6,17 +6,26 @@ import argparse
 import collections
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.style.use('ggplot')
+
 from bokeh.charts import Bar
 from bokeh.plotting import show, output_file
 from bokeh.models.widgets import Panel, Tabs
 from bokeh.io import gridplot
 from bokeh.charts import defaults
+
 import memparser as mp
+import tracemisc as tm
+
 
 SCREEN_WIDTH = 1560
 
-defaults.width = int(SCREEN_WIDTH * 0.3)
+defaults.width = int(SCREEN_WIDTH * 0.22)
 defaults.height = int(SCREEN_WIDTH * 0.22)
+
+ENABLE_SEABORN = True
 
 
 def is_all_zeros(column):
@@ -34,6 +43,7 @@ class Report(object):
             self.__dataframe = dataframe
             return
         if report_file:
+            self.__report_file = report_file
             self.__dataframe = mp.get_df(report_file)
 
     def substract(self, other):
@@ -114,6 +124,16 @@ class Report(object):
 
     def __get_figure_bar(self, dataframe_main, column_name, xlabel, ylabel):
         if not is_all_zeros(dataframe_main[column_name]):
+            # Save to file
+            if ENABLE_SEABORN:
+                output_file_name = self.__report_file.split('.')[0]
+                output_file_name += '_' + xlabel + '_' + column_name + '.eps'
+
+                bar_plot = dataframe_main[column_name].plot(kind='bar')
+                bar_plot.figure.savefig(output_file_name)
+                bar_plot.figure.clf()
+
+            # Bokeh draw
             mean = np.round_(dataframe_main[column_name].mean(), 4)
             bar_ratio = Bar(dataframe_main,
                             values=column_name,
@@ -131,6 +151,22 @@ class Report(object):
                                  var_name='type',
                                  value_name='count')
         if not is_all_zeros(dataframe_melt['count']):
+            # Save to eps file
+            if ENABLE_SEABORN:
+                output_file_name = self.__report_file.split('.')[0]
+                output_file_name += '_' + xlabel
+                for column_name in column_names:
+                    output_file_name += '_' + column_name
+                output_file_name += '.eps'
+
+                dataframe_stack = dataframe_main[column_names]
+                bar_stack = dataframe_stack.plot(
+                    kind='bar', stacked=True)
+                bar_stack_fig = bar_stack.get_figure()
+                bar_stack_fig.savefig(output_file_name)
+                bar_stack_fig.clf()
+
+            # Bokeh draw
             title = 'Avg:'
             for column in column_names:
                 mean = np.round_(dataframe_main[column].mean(), 4)
@@ -371,6 +407,7 @@ class Reports(object):
     def __init__(self, report_files, enable_substract=True):
         self.__report_files = report_files
         self.__reports = []
+        self.__is_sub = enable_substract
         for report in self.__report_files:
             self.__reports.append(Report(report))
 
@@ -379,24 +416,64 @@ class Reports(object):
             for index in range(1, len(self.__reports)):
                 self.__reports[index].substract(self.__reports[0])
 
-    def plot(self):
-        """ Plot """
-        output_file_name = 'mem_report'
+    def __save_html(self):
+        output_file_name = 'mem_'
+
+        # Raw data or substracted data
+        if self.__is_sub:
+            output_file_name += 'sub_'
+        else:
+            output_file_name += 'raw_'
+
+        # Title
+        output_file_title = 'Mem report: '
+
+        gpu_conf = {}
+        schedule = {}
+        workload = {}
+
+        for report_file in self.__report_files:
+            meta = report_file.split('.')[0].split("_")
+            gpu_conf[meta[0]] = 1
+            schedule[meta[2]] = 1
+            workload[meta[3]] = 1
+
+        suffix = ''
+        if len(gpu_conf) >= 5:
+            suffix += str(len(gpu_conf)) + '_gpu_confs'
+        else:
+            for key in gpu_conf.keys():
+                suffix += key + '_'
+
+        if len(schedule) >= 5:
+            suffix += str(len(schedule)) + '_schedules'
+        else:
+            for key in schedule.keys():
+                suffix += key + '_'
+
+        if len(workload) >= 5:
+            suffix += str(len(workload)) + '_workloads'
+        else:
+            for key in workload.keys():
+                suffix += key + '_'
+
+        output_file_name += suffix
+        output_file_title += suffix
         output_file_name += '.html'
-        output_file_title = 'Mem report'
         output_file(output_file_name, title=output_file_title)
 
-        # Create figure dict
+    def plot(self):
+        """ Plot """
+        # Create html file
+        self.__save_html()
+
+        # Create figures
         figures = collections.OrderedDict()
         for report in self.__reports:
             figure_dict = report.get_info()['figures']
             for key, value in figure_dict.iteritems():
-                figures[key] = []
-
-        # Fill figure dict
-        for report in self.__reports:
-            figure_dict = report.get_info()['figures']
-            for key, value in figure_dict.iteritems():
+                if key not in figures.keys():
+                    figures[key] = []
                 figures[key].append(value)
 
         # Plot all figures by tabs
@@ -422,8 +499,15 @@ def main():
     parser.add_argument("-s", "--substract",
                         action="store_true",
                         help='Substract the 1st file')
+    parser.add_argument("-st", "--sort",
+                        action="store_true",
+                        help='Sort the reports in natural order')
 
     args = parser.parse_args()
+
+    # Sort the files in human natural order
+    if args.sort:
+        args.memRptFiles.sort(key=tm.natural_keys)
 
     reports = Reports(args.memRptFiles, args.substract)
     reports.plot()
