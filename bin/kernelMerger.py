@@ -1,13 +1,16 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import argparse
+import itertools
 
 
 class Kernel:
+    """A kernel contains several kernel functions"""
 
-    def __init__(self, file=None):
-        if file is not None:
-            self.file_ = open(file, "r")
+    def __init__(self, file_name=None):
+        self.file_name = file_name
+        if file_name is not None:
+            self.file_ = open(file_name, "r")
             self.funcs_ = self.buildFuncList()
         else:
             self.file_ = ""
@@ -19,7 +22,7 @@ class Kernel:
         for line in self.file_:
             raw_text = raw_text + line
             if "TGID_Z_EN = 1" in line:
-                kernel_func = KernelFunc(raw_text)
+                kernel_func = KernelFunc(self.file_name, raw_text)
                 funcs.append(kernel_func)
                 raw_text = ""
         return funcs
@@ -28,14 +31,18 @@ class Kernel:
     def __eq__(self, other):
         return len(self.funcs_) == len(other.funcs_)
 
-    def dump(self):
+    def dump(self, file_name):
+        asm = ''
         for index in range(len(self.funcs_)):
-            self.funcs_[index].dump()
+            asm += self.funcs_[index].get_asm()
+        with open(file_name, "w") as text_file:
+            text_file.write(asm)
 
 
 class KernelFunc:
 
-    def __init__(self, raw_text=None):
+    def __init__(self, kernel_name, raw_text=None):
+        self.kernel_name_ = kernel_name
         if raw_text is not None:
             self.raw_text_ = raw_text
         else:
@@ -73,6 +80,13 @@ class KernelFunc:
         print self.args_section_
         print self.metadata_section_
 
+    def get_asm(self):
+        asm = self.globl_section_
+        asm += self.text_section_
+        asm += self.args_section_
+        asm += self.metadata_section_
+        return asm
+
 
 class KernelMerger:
 
@@ -81,7 +95,7 @@ class KernelMerger:
 
     def mergeKernel(self, kernel0, kernel1):
         # Make sure contains same amount of kernel functions
-        assert(kernel0 == kernel1)
+        assert kernel0 == kernel1
 
         for index in range(len(kernel0.funcs_)):
             merged_func = self.mergeFunc(
@@ -91,7 +105,7 @@ class KernelMerger:
 
     def mergeFunc(self, kernelFunc0, kernelFunc1):
 
-        kernel_func_merged = KernelFunc()
+        kernel_func_merged = KernelFunc('merged')
 
         # Only merge .text section, other sections are inherited from
         # kernelFunc0
@@ -103,9 +117,11 @@ class KernelMerger:
             kernel_func_merged.metadata_section_ += \
                 "// Merge warning: sections do not match\n"
         kernel_func_merged.metadata_section_ += kernelFunc0.metadata_section_
+        kernel_func_merged.metadata_section_ += '// Merged ' + \
+            kernelFunc0.kernel_name_ + ' ' + kernelFunc1.kernel_name_ + '\n\n'
 
         # Ignore first 3 lines
-        text_section = "// ********************* Second kernel starts\n"
+        text_section = ""
         start_append = False
         for line in kernelFunc1.text_section_.splitlines():
             if "entry" in line:
@@ -127,16 +143,24 @@ def main():
     # Arg parser
     parser = argparse.ArgumentParser(
         description='Multi2Sim kernel merger')
-    parser.add_argument('kernels', nargs=2, help='2 Kernels to be merged')
+    parser.add_argument('kernels', nargs='+', help='2 Kernels to be merged')
 
     args = parser.parse_args()
 
-    km = KernelMerger()
-    kernel0 = Kernel(args.kernels[0])
-    kernel1 = Kernel(args.kernels[1])
+    for subset in itertools.combinations(args.kernels, 2):
+        kernel0_str, kernel1_str = subset
+        common_prefix = kernel0_str.split('_')[0]
+        kernel0_sched = kernel0_str[:-2].split('_')[2]
+        kernel1_sched = kernel1_str[:-2].split('_')[2]
 
-    merged_kernel = km.mergeKernel(kernel0, kernel1)
-    merged_kernel.dump()
+        file_name = "_".join([common_prefix, 'fuse',
+                              kernel0_sched, kernel1_sched]) + '.s'
+        print 'Merging: ', kernel0_str, kernel1_str
+        kernel0 = Kernel(kernel0_str)
+        kernel1 = Kernel(kernel1_str)
+        km = KernelMerger()
+        merged_kernel = km.mergeKernel(kernel0, kernel1)
+        merged_kernel.dump(file_name)
 
 if __name__ == '__main__':
     main()

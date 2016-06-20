@@ -29,117 +29,58 @@ endif
 CURDIR = $(shell pwd)
 
 amdRef: BufferImageInterop_kernels.cl
-	@-rm -f *.il *.i *.isa
-	@-$(AMDCC) $< >/dev/null 2>&1
-	@-rm -f *.il *.i 
-	@-rename 's/_temp_0_Capeverde_//' *.isa
-	@-rm -f _temp_0*
+	rm -f *.il *.i *.isa
+	$(AMDCC) $< >/dev/null 2>&1
+	rm -f *.il *.i 
+	rename 's/_temp_0_Capeverde_//' *.isa
+	rm -f _temp_0*
 
 ir: BufferImageInterop_kernels.cl
-	@-$(CLANG) $(CLANG_INC) $(CLANG_PAR) $< > log.0 2>&1 
+	$(CLANG) $(CLANG_INC) $(CLANG_PAR) $< > log.0 2>&1 
 
 irRef: BufferImageInterop_kernels.cl
-	@-$(CLANG) $(CLANG_INC) $(CLANG_PAR_REF) $< -o BufferImageInterop_kernels_ref.ll > log.0.ref 2>&1 
+	$(CLANG) $(CLANG_INC) $(CLANG_PAR_REF) $< -o BufferImageInterop_kernels_ref.ll > log.0.ref 2>&1 
 
 asm: ir
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug > log.1 2>&1
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --misched=si -o BufferImageInterop_kernels_sched.s > log.sched.1 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --pre-RA-sched=source -o BufferImageInterop_kernels_source.s  > log.1.source 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --pre-RA-sched=list-ilp -o BufferImageInterop_kernels_ilp.s  > log.1.ilp 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --pre-RA-sched=list-hybrid -o BufferImageInterop_kernels_hybrid.s > log.1.hybrid 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --pre-RA-sched=list-burr -o BufferImageInterop_kernels_burr.s > log.1.burr 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --pre-RA-sched=fast -o BufferImageInterop_kernels_fast.s > log.1.fast 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --pre-RA-sched=source --misched=si -o BufferImageInterop_kernels_misource.s  > log.1.misource 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --pre-RA-sched=list-ilp --misched=si -o BufferImageInterop_kernels_miilp.s  > log.1.miilp 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --pre-RA-sched=list-hybrid --misched=si -o BufferImageInterop_kernels_mihybrid.s > log.1.mihybrid 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --pre-RA-sched=list-burr --misched=si -o BufferImageInterop_kernels_miburr.s > log.1.miburr 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --pre-RA-sched=fast --misched=si -o BufferImageInterop_kernels_mifast.s > log.1.mifast 2>&1
 
 asmlsroff: ir
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug > log.1 2>&1
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug --misched=si -o BufferImageInterop_kernels_sched.s > log.1 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=source -o BufferImageInterop_kernels_source.s  > log.1.source 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-ilp -o BufferImageInterop_kernels_ilp.s  > log.1.ilp 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-hybrid -o BufferImageInterop_kernels_hybrid.s > log.1.hybrid 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-burr -o BufferImageInterop_kernels_burr.s > log.1.burr 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=fast -o BufferImageInterop_kernels_fast.s > log.1.fast 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=source --misched=si -o BufferImageInterop_kernels_misource.s  > log.1.misource 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-ilp --misched=si -o BufferImageInterop_kernels_miilp.s  > log.1.miilp 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-hybrid --misched=si -o BufferImageInterop_kernels_mihybrid.s > log.1.mihybrid 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-burr --misched=si -o BufferImageInterop_kernels_miburr.s > log.1.miburr 2>&1
+	$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=fast --misched=si -o BufferImageInterop_kernels_mifast.s > log.1.mifast 2>&1
 
 asmmerge:
-	@-$(KERNELMERGER) BufferImageInterop_kernels.s BufferImageInterop_kernels_sched.s > BufferImageInterop_kernels_fusion.s
+	rm -f *fuse*
+	$(KERNELMERGER) $(wildcard *.s)
 
 asmpre2bin:
-	@-$(PRETOBIN) BufferImageInterop_kernels.s > log.2 2>&1
-	@-$(PRETOBIN) BufferImageInterop_kernels_sched.s > log.sched.2 2>&1
+	for kernel_asm in $(wildcard *.s); do \
+		$(PRETOBIN) $$kernel_asm; \
+	done
 
-asm2bin: asmmerge
-	@-$(M2C) --si2bin BufferImageInterop_kernels.s > log.2 2>&1
-	@-$(M2C) --si2bin BufferImageInterop_kernels_sched.s > log.sched.2 2>&1
-	@-$(M2C) --si2bin BufferImageInterop_kernels_fusion.s > log.fusion.2 2>&1
-
-2bingdb:
-	@-gdb --args $(M2C) --si2bin BufferImageInterop_kernels.s
+asm2bin:
+	for kernel_asm in $(wildcard *.s); do \
+		$(M2C) --si2bin $$kernel_asm; \
+	done
 
 scpbin: 
-	@-scp BufferImageInterop_kernels.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BufferImageInterop
-	@-scp BufferImageInterop_kernels_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BufferImageInterop
-	@-scp BufferImageInterop_kernels_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BufferImageInterop
-
-run: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make run"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runsched"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runfusion"
-
-rundt: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make rundt"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runscheddt"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runfusiondt"
-
-scale: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make scale"
-
-runtrace: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runtrace"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runschedtrace" 
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make runfusiontrace" 
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
-	@-gzip -d *.gz
-
-rungettrace:
-	@-mkdir trace
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; scp -r *.rpt xgong@$(MYIP):$(CURDIR)/trace"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; scp -r *.gz xgong@$(MYIP):$(CURDIR)/trace"
-
-runanalyse:
-	@-$(TRACEANALYSER) BufferImageInterop_kernels BufferImageInterop_kernels_sched BufferImageInterop_kernels_fusion
-
-runisa: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BufferImageInterop; make && make isasched && scp debug.sched.isa xgong@$(MYIP):$(CURDIR)"
-
-asmcb1: ir
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --view-dag-combine1-dags > log.1 2>&1
-
-asmlgl: ir
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --view-legalize-dags > log.1 2>&1
-
-asmcb2: ir
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --view-dag-combine2-dags > log.1 2>&1
-
-asmisel: ir
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --view-isel-dags > log.1 2>&1
-
-asmschd: ir
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug --view-sched-dags > log.1 2>&1
-
-asmRef: irRef
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels_ref.ll --print-after-all --debug > log.1.ref 2>&1
-
-asmcb1Ref: irRef
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels_ref.ll --print-after-all --debug --view-dag-combine1-dags > log.1.ref 2>&1
-
-asmlgRef: irRef
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels_ref.ll --print-after-all --debug --view-legalize-dags > log.1.ref 2>&1
-
-asmcb2Ref: irRef
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels_ref.ll --print-after-all --debug --view-dag-combine2-dags > log.1.ref 2>&1
-
-asmiselRef: irRef
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels_ref.ll --print-after-all --debug --view-isel-dags > log.1.ref 2>&1
-
-asmschdRef: irRef
-	@-$(LLC) $(LLC_PAR) BufferImageInterop_kernels_ref.ll --print-after-all --debug --view-sched-dags > log.1.ref 2>&1
-
-gdb: ir
-	gdb --args $(LLC) $(LLC_PAR) BufferImageInterop_kernels.ll --print-after-all --debug
-
-gdbRef: irRef
-	gdb --args $(LLC) $(LLC_PAR) BufferImageInterop_kernels_ref.ll --print-after-all --debug
+	scp *.bin $(REMOTE_SERVER):$(REMOTE_PATH)/BufferImageInterop
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db BufferImageInterop_kernels BufferImageInterop_kernels_sched BufferImageInterop_kernels_fusion
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db

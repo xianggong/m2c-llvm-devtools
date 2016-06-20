@@ -29,117 +29,58 @@ endif
 CURDIR = $(shell pwd)
 
 amdRef: VectorAddition_Kernel.cl
-	@-rm -f *.il *.i *.isa
-	@-$(AMDCC) $< >/dev/null 2>&1
-	@-rm -f *.il *.i 
-	@-rename 's/_temp_0_Capeverde_//' *.isa
-	@-rm -f _temp_0*
+	rm -f *.il *.i *.isa
+	$(AMDCC) $< >/dev/null 2>&1
+	rm -f *.il *.i 
+	rename 's/_temp_0_Capeverde_//' *.isa
+	rm -f _temp_0*
 
 ir: VectorAddition_Kernel.cl
-	@-$(CLANG) $(CLANG_INC) $(CLANG_PAR) $< > log.0 2>&1 
+	$(CLANG) $(CLANG_INC) $(CLANG_PAR) $< > log.0 2>&1 
 
 irRef: VectorAddition_Kernel.cl
-	@-$(CLANG) $(CLANG_INC) $(CLANG_PAR_REF) $< -o VectorAddition_Kernel_ref.ll > log.0.ref 2>&1 
+	$(CLANG) $(CLANG_INC) $(CLANG_PAR_REF) $< -o VectorAddition_Kernel_ref.ll > log.0.ref 2>&1 
 
 asm: ir
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug > log.1 2>&1
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --misched=si -o VectorAddition_Kernel_sched.s > log.sched.1 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --pre-RA-sched=source -o VectorAddition_Kernel_source.s  > log.1.source 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --pre-RA-sched=list-ilp -o VectorAddition_Kernel_ilp.s  > log.1.ilp 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --pre-RA-sched=list-hybrid -o VectorAddition_Kernel_hybrid.s > log.1.hybrid 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --pre-RA-sched=list-burr -o VectorAddition_Kernel_burr.s > log.1.burr 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --pre-RA-sched=fast -o VectorAddition_Kernel_fast.s > log.1.fast 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --pre-RA-sched=source --misched=si -o VectorAddition_Kernel_misource.s  > log.1.misource 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --pre-RA-sched=list-ilp --misched=si -o VectorAddition_Kernel_miilp.s  > log.1.miilp 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --pre-RA-sched=list-hybrid --misched=si -o VectorAddition_Kernel_mihybrid.s > log.1.mihybrid 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --pre-RA-sched=list-burr --misched=si -o VectorAddition_Kernel_miburr.s > log.1.miburr 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --pre-RA-sched=fast --misched=si -o VectorAddition_Kernel_mifast.s > log.1.mifast 2>&1
 
 asmlsroff: ir
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug > log.1 2>&1
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug --misched=si -o VectorAddition_Kernel_sched.s > log.1 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug --pre-RA-sched=source -o VectorAddition_Kernel_source.s  > log.1.source 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-ilp -o VectorAddition_Kernel_ilp.s  > log.1.ilp 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-hybrid -o VectorAddition_Kernel_hybrid.s > log.1.hybrid 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-burr -o VectorAddition_Kernel_burr.s > log.1.burr 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug --pre-RA-sched=fast -o VectorAddition_Kernel_fast.s > log.1.fast 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug --pre-RA-sched=source --misched=si -o VectorAddition_Kernel_misource.s  > log.1.misource 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-ilp --misched=si -o VectorAddition_Kernel_miilp.s  > log.1.miilp 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-hybrid --misched=si -o VectorAddition_Kernel_mihybrid.s > log.1.mihybrid 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-burr --misched=si -o VectorAddition_Kernel_miburr.s > log.1.miburr 2>&1
+	$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --disable-lsr --print-after-all --debug --pre-RA-sched=fast --misched=si -o VectorAddition_Kernel_mifast.s > log.1.mifast 2>&1
 
 asmmerge:
-	@-$(KERNELMERGER) VectorAddition_Kernel.s VectorAddition_Kernel_sched.s > VectorAddition_Kernel_fusion.s
+	rm -f *fuse*
+	$(KERNELMERGER) $(wildcard *.s)
 
 asmpre2bin:
-	@-$(PRETOBIN) VectorAddition_Kernel.s > log.2 2>&1
-	@-$(PRETOBIN) VectorAddition_Kernel_sched.s > log.sched.2 2>&1
+	for kernel_asm in $(wildcard *.s); do \
+		$(PRETOBIN) $$kernel_asm; \
+	done
 
-asm2bin: asmmerge
-	@-$(M2C) --si2bin VectorAddition_Kernel.s > log.2 2>&1
-	@-$(M2C) --si2bin VectorAddition_Kernel_sched.s > log.sched.2 2>&1
-	@-$(M2C) --si2bin VectorAddition_Kernel_fusion.s > log.fusion.2 2>&1
-
-2bingdb:
-	@-gdb --args $(M2C) --si2bin VectorAddition_Kernel.s
+asm2bin:
+	for kernel_asm in $(wildcard *.s); do \
+		$(M2C) --si2bin $$kernel_asm; \
+	done
 
 scpbin: 
-	@-scp VectorAddition_Kernel.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/VectorAddition
-	@-scp VectorAddition_Kernel_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/VectorAddition
-	@-scp VectorAddition_Kernel_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/VectorAddition
-
-run: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make run"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runsched"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runfusion"
-
-rundt: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make rundt"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runscheddt"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runfusiondt"
-
-scale: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make scale"
-
-runtrace: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runtrace"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runschedtrace" 
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make runfusiontrace" 
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
-	@-gzip -d *.gz
-
-rungettrace:
-	@-mkdir trace
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; scp -r *.rpt xgong@$(MYIP):$(CURDIR)/trace"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; scp -r *.gz xgong@$(MYIP):$(CURDIR)/trace"
-
-runanalyse:
-	@-$(TRACEANALYSER) VectorAddition_Kernel VectorAddition_Kernel_sched VectorAddition_Kernel_fusion
-
-runisa: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/VectorAddition; make && make isasched && scp debug.sched.isa xgong@$(MYIP):$(CURDIR)"
-
-asmcb1: ir
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --view-dag-combine1-dags > log.1 2>&1
-
-asmlgl: ir
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --view-legalize-dags > log.1 2>&1
-
-asmcb2: ir
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --view-dag-combine2-dags > log.1 2>&1
-
-asmisel: ir
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --view-isel-dags > log.1 2>&1
-
-asmschd: ir
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug --view-sched-dags > log.1 2>&1
-
-asmRef: irRef
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel_ref.ll --print-after-all --debug > log.1.ref 2>&1
-
-asmcb1Ref: irRef
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel_ref.ll --print-after-all --debug --view-dag-combine1-dags > log.1.ref 2>&1
-
-asmlgRef: irRef
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel_ref.ll --print-after-all --debug --view-legalize-dags > log.1.ref 2>&1
-
-asmcb2Ref: irRef
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel_ref.ll --print-after-all --debug --view-dag-combine2-dags > log.1.ref 2>&1
-
-asmiselRef: irRef
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel_ref.ll --print-after-all --debug --view-isel-dags > log.1.ref 2>&1
-
-asmschdRef: irRef
-	@-$(LLC) $(LLC_PAR) VectorAddition_Kernel_ref.ll --print-after-all --debug --view-sched-dags > log.1.ref 2>&1
-
-gdb: ir
-	gdb --args $(LLC) $(LLC_PAR) VectorAddition_Kernel.ll --print-after-all --debug
-
-gdbRef: irRef
-	gdb --args $(LLC) $(LLC_PAR) VectorAddition_Kernel_ref.ll --print-after-all --debug
+	scp *.bin $(REMOTE_SERVER):$(REMOTE_PATH)/VectorAddition
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db VectorAddition_Kernel VectorAddition_Kernel_sched VectorAddition_Kernel_fusion
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db

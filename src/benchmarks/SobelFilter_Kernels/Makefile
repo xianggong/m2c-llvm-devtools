@@ -29,117 +29,58 @@ endif
 CURDIR = $(shell pwd)
 
 amdRef: SobelFilter_Kernels.cl
-	@-rm -f *.il *.i *.isa
-	@-$(AMDCC) $< >/dev/null 2>&1
-	@-rm -f *.il *.i 
-	@-rename 's/_temp_0_Capeverde_//' *.isa
-	@-rm -f _temp_0*
+	rm -f *.il *.i *.isa
+	$(AMDCC) $< >/dev/null 2>&1
+	rm -f *.il *.i 
+	rename 's/_temp_0_Capeverde_//' *.isa
+	rm -f _temp_0*
 
 ir: SobelFilter_Kernels.cl
-	@-$(CLANG) $(CLANG_INC) $(CLANG_PAR) $< > log.0 2>&1 
+	$(CLANG) $(CLANG_INC) $(CLANG_PAR) $< > log.0 2>&1 
 
 irRef: SobelFilter_Kernels.cl
-	@-$(CLANG) $(CLANG_INC) $(CLANG_PAR_REF) $< -o SobelFilter_Kernels_ref.ll > log.0.ref 2>&1 
+	$(CLANG) $(CLANG_INC) $(CLANG_PAR_REF) $< -o SobelFilter_Kernels_ref.ll > log.0.ref 2>&1 
 
 asm: ir
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug > log.1 2>&1
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --misched=si -o SobelFilter_Kernels_sched.s > log.sched.1 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --pre-RA-sched=source -o SobelFilter_Kernels_source.s  > log.1.source 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --pre-RA-sched=list-ilp -o SobelFilter_Kernels_ilp.s  > log.1.ilp 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --pre-RA-sched=list-hybrid -o SobelFilter_Kernels_hybrid.s > log.1.hybrid 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --pre-RA-sched=list-burr -o SobelFilter_Kernels_burr.s > log.1.burr 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --pre-RA-sched=fast -o SobelFilter_Kernels_fast.s > log.1.fast 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --pre-RA-sched=source --misched=si -o SobelFilter_Kernels_misource.s  > log.1.misource 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --pre-RA-sched=list-ilp --misched=si -o SobelFilter_Kernels_miilp.s  > log.1.miilp 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --pre-RA-sched=list-hybrid --misched=si -o SobelFilter_Kernels_mihybrid.s > log.1.mihybrid 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --pre-RA-sched=list-burr --misched=si -o SobelFilter_Kernels_miburr.s > log.1.miburr 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --pre-RA-sched=fast --misched=si -o SobelFilter_Kernels_mifast.s > log.1.mifast 2>&1
 
 asmlsroff: ir
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --disable-lsr --print-after-all --debug > log.1 2>&1
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --disable-lsr --print-after-all --debug --misched=si -o SobelFilter_Kernels_sched.s > log.1 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=source -o SobelFilter_Kernels_source.s  > log.1.source 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-ilp -o SobelFilter_Kernels_ilp.s  > log.1.ilp 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-hybrid -o SobelFilter_Kernels_hybrid.s > log.1.hybrid 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-burr -o SobelFilter_Kernels_burr.s > log.1.burr 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=fast -o SobelFilter_Kernels_fast.s > log.1.fast 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=source --misched=si -o SobelFilter_Kernels_misource.s  > log.1.misource 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-ilp --misched=si -o SobelFilter_Kernels_miilp.s  > log.1.miilp 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-hybrid --misched=si -o SobelFilter_Kernels_mihybrid.s > log.1.mihybrid 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-burr --misched=si -o SobelFilter_Kernels_miburr.s > log.1.miburr 2>&1
+	$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --disable-lsr --print-after-all --debug --pre-RA-sched=fast --misched=si -o SobelFilter_Kernels_mifast.s > log.1.mifast 2>&1
 
 asmmerge:
-	@-$(KERNELMERGER) SobelFilter_Kernels.s SobelFilter_Kernels_sched.s > SobelFilter_Kernels_fusion.s
+	rm -f *fuse*
+	$(KERNELMERGER) $(wildcard *.s)
 
 asmpre2bin:
-	@-$(PRETOBIN) SobelFilter_Kernels.s > log.2 2>&1
-	@-$(PRETOBIN) SobelFilter_Kernels_sched.s > log.sched.2 2>&1
+	for kernel_asm in $(wildcard *.s); do \
+		$(PRETOBIN) $$kernel_asm; \
+	done
 
-asm2bin: asmmerge
-	@-$(M2C) --si2bin SobelFilter_Kernels.s > log.2 2>&1
-	@-$(M2C) --si2bin SobelFilter_Kernels_sched.s > log.sched.2 2>&1
-	@-$(M2C) --si2bin SobelFilter_Kernels_fusion.s > log.fusion.2 2>&1
-
-2bingdb:
-	@-gdb --args $(M2C) --si2bin SobelFilter_Kernels.s
+asm2bin:
+	for kernel_asm in $(wildcard *.s); do \
+		$(M2C) --si2bin $$kernel_asm; \
+	done
 
 scpbin: 
-	@-scp SobelFilter_Kernels.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/SobelFilter
-	@-scp SobelFilter_Kernels_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/SobelFilter
-	@-scp SobelFilter_Kernels_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/SobelFilter
-
-run: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make run"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make runsched"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make runfusion"
-
-rundt: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make rundt"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make runscheddt"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make runfusiondt"
-
-scale: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make scale"
-
-runtrace: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make runtrace"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make runschedtrace" 
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make runfusiontrace" 
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
-	@-gzip -d *.gz
-
-rungettrace:
-	@-mkdir trace
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; scp -r *.rpt xgong@$(MYIP):$(CURDIR)/trace"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; scp -r *.gz xgong@$(MYIP):$(CURDIR)/trace"
-
-runanalyse:
-	@-$(TRACEANALYSER) SobelFilter_Kernels SobelFilter_Kernels_sched SobelFilter_Kernels_fusion
-
-runisa: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/SobelFilter; make && make isasched && scp debug.sched.isa xgong@$(MYIP):$(CURDIR)"
-
-asmcb1: ir
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --view-dag-combine1-dags > log.1 2>&1
-
-asmlgl: ir
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --view-legalize-dags > log.1 2>&1
-
-asmcb2: ir
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --view-dag-combine2-dags > log.1 2>&1
-
-asmisel: ir
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --view-isel-dags > log.1 2>&1
-
-asmschd: ir
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug --view-sched-dags > log.1 2>&1
-
-asmRef: irRef
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels_ref.ll --print-after-all --debug > log.1.ref 2>&1
-
-asmcb1Ref: irRef
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels_ref.ll --print-after-all --debug --view-dag-combine1-dags > log.1.ref 2>&1
-
-asmlgRef: irRef
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels_ref.ll --print-after-all --debug --view-legalize-dags > log.1.ref 2>&1
-
-asmcb2Ref: irRef
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels_ref.ll --print-after-all --debug --view-dag-combine2-dags > log.1.ref 2>&1
-
-asmiselRef: irRef
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels_ref.ll --print-after-all --debug --view-isel-dags > log.1.ref 2>&1
-
-asmschdRef: irRef
-	@-$(LLC) $(LLC_PAR) SobelFilter_Kernels_ref.ll --print-after-all --debug --view-sched-dags > log.1.ref 2>&1
-
-gdb: ir
-	gdb --args $(LLC) $(LLC_PAR) SobelFilter_Kernels.ll --print-after-all --debug
-
-gdbRef: irRef
-	gdb --args $(LLC) $(LLC_PAR) SobelFilter_Kernels_ref.ll --print-after-all --debug
+	scp *.bin $(REMOTE_SERVER):$(REMOTE_PATH)/SobelFilter
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db SobelFilter_Kernels SobelFilter_Kernels_sched SobelFilter_Kernels_fusion
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db

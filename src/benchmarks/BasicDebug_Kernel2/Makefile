@@ -29,117 +29,58 @@ endif
 CURDIR = $(shell pwd)
 
 amdRef: BasicDebug_Kernel2.cl
-	@-rm -f *.il *.i *.isa
-	@-$(AMDCC) $< >/dev/null 2>&1
-	@-rm -f *.il *.i 
-	@-rename 's/_temp_0_Capeverde_//' *.isa
-	@-rm -f _temp_0*
+	rm -f *.il *.i *.isa
+	$(AMDCC) $< >/dev/null 2>&1
+	rm -f *.il *.i 
+	rename 's/_temp_0_Capeverde_//' *.isa
+	rm -f _temp_0*
 
 ir: BasicDebug_Kernel2.cl
-	@-$(CLANG) $(CLANG_INC) $(CLANG_PAR) $< > log.0 2>&1 
+	$(CLANG) $(CLANG_INC) $(CLANG_PAR) $< > log.0 2>&1 
 
 irRef: BasicDebug_Kernel2.cl
-	@-$(CLANG) $(CLANG_INC) $(CLANG_PAR_REF) $< -o BasicDebug_Kernel2_ref.ll > log.0.ref 2>&1 
+	$(CLANG) $(CLANG_INC) $(CLANG_PAR_REF) $< -o BasicDebug_Kernel2_ref.ll > log.0.ref 2>&1 
 
 asm: ir
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug > log.1 2>&1
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --misched=si -o BasicDebug_Kernel2_sched.s > log.sched.1 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --pre-RA-sched=source -o BasicDebug_Kernel2_source.s  > log.1.source 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --pre-RA-sched=list-ilp -o BasicDebug_Kernel2_ilp.s  > log.1.ilp 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --pre-RA-sched=list-hybrid -o BasicDebug_Kernel2_hybrid.s > log.1.hybrid 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --pre-RA-sched=list-burr -o BasicDebug_Kernel2_burr.s > log.1.burr 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --pre-RA-sched=fast -o BasicDebug_Kernel2_fast.s > log.1.fast 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --pre-RA-sched=source --misched=si -o BasicDebug_Kernel2_misource.s  > log.1.misource 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --pre-RA-sched=list-ilp --misched=si -o BasicDebug_Kernel2_miilp.s  > log.1.miilp 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --pre-RA-sched=list-hybrid --misched=si -o BasicDebug_Kernel2_mihybrid.s > log.1.mihybrid 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --pre-RA-sched=list-burr --misched=si -o BasicDebug_Kernel2_miburr.s > log.1.miburr 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --pre-RA-sched=fast --misched=si -o BasicDebug_Kernel2_mifast.s > log.1.mifast 2>&1
 
 asmlsroff: ir
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug > log.1 2>&1
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug --misched=si -o BasicDebug_Kernel2_sched.s > log.1 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug --pre-RA-sched=source -o BasicDebug_Kernel2_source.s  > log.1.source 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-ilp -o BasicDebug_Kernel2_ilp.s  > log.1.ilp 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-hybrid -o BasicDebug_Kernel2_hybrid.s > log.1.hybrid 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-burr -o BasicDebug_Kernel2_burr.s > log.1.burr 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug --pre-RA-sched=fast -o BasicDebug_Kernel2_fast.s > log.1.fast 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug --pre-RA-sched=source --misched=si -o BasicDebug_Kernel2_misource.s  > log.1.misource 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-ilp --misched=si -o BasicDebug_Kernel2_miilp.s  > log.1.miilp 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-hybrid --misched=si -o BasicDebug_Kernel2_mihybrid.s > log.1.mihybrid 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug --pre-RA-sched=list-burr --misched=si -o BasicDebug_Kernel2_miburr.s > log.1.miburr 2>&1
+	$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --disable-lsr --print-after-all --debug --pre-RA-sched=fast --misched=si -o BasicDebug_Kernel2_mifast.s > log.1.mifast 2>&1
 
 asmmerge:
-	@-$(KERNELMERGER) BasicDebug_Kernel2.s BasicDebug_Kernel2_sched.s > BasicDebug_Kernel2_fusion.s
+	rm -f *fuse*
+	$(KERNELMERGER) $(wildcard *.s)
 
 asmpre2bin:
-	@-$(PRETOBIN) BasicDebug_Kernel2.s > log.2 2>&1
-	@-$(PRETOBIN) BasicDebug_Kernel2_sched.s > log.sched.2 2>&1
+	for kernel_asm in $(wildcard *.s); do \
+		$(PRETOBIN) $$kernel_asm; \
+	done
 
-asm2bin: asmmerge
-	@-$(M2C) --si2bin BasicDebug_Kernel2.s > log.2 2>&1
-	@-$(M2C) --si2bin BasicDebug_Kernel2_sched.s > log.sched.2 2>&1
-	@-$(M2C) --si2bin BasicDebug_Kernel2_fusion.s > log.fusion.2 2>&1
-
-2bingdb:
-	@-gdb --args $(M2C) --si2bin BasicDebug_Kernel2.s
+asm2bin:
+	for kernel_asm in $(wildcard *.s); do \
+		$(M2C) --si2bin $$kernel_asm; \
+	done
 
 scpbin: 
-	@-scp BasicDebug_Kernel2.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BasicDebug
-	@-scp BasicDebug_Kernel2_sched.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BasicDebug
-	@-scp BasicDebug_Kernel2_fusion.bin $(REMOTE_SERVER):$(REMOTE_PATH)/src/benchmarks/BasicDebug
-
-run: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make run"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runsched"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runfusion"
-
-rundt: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make rundt"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runscheddt"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runfusiondt"
-
-scale: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make scale"
-
-runtrace: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runtrace"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runschedtrace" 
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make runfusiontrace" 
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; scp -r *.rpt xgong@$(MYIP):$(CURDIR)"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; scp -r *.gz xgong@$(MYIP):$(CURDIR)"
-	@-gzip -d *.gz
-
-rungettrace:
-	@-mkdir trace
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; scp -r *.rpt xgong@$(MYIP):$(CURDIR)/trace"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; scp -r *.gz xgong@$(MYIP):$(CURDIR)/trace"
-
-runanalyse:
-	@-$(TRACEANALYSER) BasicDebug_Kernel2 BasicDebug_Kernel2_sched BasicDebug_Kernel2_fusion
-
-runisa: scpbin
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make isa && scp debug.isa xgong@$(MYIP):$(CURDIR)"
-	@-ssh $(REMOTE_SERVER) "cd $(REMOTE_PATH)/src/benchmarks/BasicDebug; make && make isasched && scp debug.sched.isa xgong@$(MYIP):$(CURDIR)"
-
-asmcb1: ir
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --view-dag-combine1-dags > log.1 2>&1
-
-asmlgl: ir
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --view-legalize-dags > log.1 2>&1
-
-asmcb2: ir
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --view-dag-combine2-dags > log.1 2>&1
-
-asmisel: ir
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --view-isel-dags > log.1 2>&1
-
-asmschd: ir
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug --view-sched-dags > log.1 2>&1
-
-asmRef: irRef
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2_ref.ll --print-after-all --debug > log.1.ref 2>&1
-
-asmcb1Ref: irRef
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2_ref.ll --print-after-all --debug --view-dag-combine1-dags > log.1.ref 2>&1
-
-asmlgRef: irRef
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2_ref.ll --print-after-all --debug --view-legalize-dags > log.1.ref 2>&1
-
-asmcb2Ref: irRef
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2_ref.ll --print-after-all --debug --view-dag-combine2-dags > log.1.ref 2>&1
-
-asmiselRef: irRef
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2_ref.ll --print-after-all --debug --view-isel-dags > log.1.ref 2>&1
-
-asmschdRef: irRef
-	@-$(LLC) $(LLC_PAR) BasicDebug_Kernel2_ref.ll --print-after-all --debug --view-sched-dags > log.1.ref 2>&1
-
-gdb: ir
-	gdb --args $(LLC) $(LLC_PAR) BasicDebug_Kernel2.ll --print-after-all --debug
-
-gdbRef: irRef
-	gdb --args $(LLC) $(LLC_PAR) BasicDebug_Kernel2_ref.ll --print-after-all --debug
+	scp *.bin $(REMOTE_SERVER):$(REMOTE_PATH)/BasicDebug
 
 clean:
-	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db BasicDebug_Kernel2 BasicDebug_Kernel2_sched BasicDebug_Kernel2_fusion
+	rm -rf *.bc *.isa *.ll log* *.s *.bin *.rpt *.gz *.html *.db

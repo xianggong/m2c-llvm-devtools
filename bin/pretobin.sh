@@ -14,3 +14,4 @@ sed -i 's/\;/\/\//g' $1
 sed -i 's/\t\.globl/.global/g' $1
 sed -i '/\.global/a .text\n' $1
 
+
